@@ -15,16 +15,13 @@ from langchain_openai import ChatOpenAI
 import ast
 import re
 
-def few_shot():
+def few_shot(config):
     # .env 파일에서 환경 변수 로드
     load_dotenv()
     api_key = os.getenv("OPENAPI_API_KEY")
-
-    # JSON 파일 경로
-    file_path = './few_shots.json'
     
     # JSON 파일 읽기
-    with open(file_path, 'r', encoding='utf-8') as file:
+    with open(config.few_shot_path, 'r', encoding='utf-8') as file:
         few_shots = json.load(file)
 
     # OpenAI 임베딩 방법을 사용하여 임베딩 정의, 비용 절감 가능한 부분(Xenova/text-embedding-ada-002 같은 허깅페이스 임베딩 모델을 사용하면 되지 않을까?)
@@ -57,18 +54,13 @@ def few_shot():
     custom_tool_list = [retriever_tool]
     
     # DB 연결 시 사용할 변수 정의
-    host = '34.173.158.39'
-    port = '3306'
-    username = 'Ssac'
-    password = 'test1234'
-    database_schema = 'classicmodels'
-    mysql_uri = f"mysql+pymysql://{username}:{password}@{host}:{port}/{database_schema}"
+    mysql_uri = f"mysql+pymysql://{config.username}:{config.password}@{config.host}:{config.port}/{config.database_schema}"
     
     # SQLite 데이터베이스 연결
     db = SQLDatabase.from_uri(mysql_uri)
     
     # OpenAI의 Chat 모델을 사용하여 LLM 정의
-    llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0, openai_api_key=api_key)
+    llm = ChatOpenAI(model_name=config.model_name, temperature=0, openai_api_key=api_key)
 
     # SQL 데이터베이스 도구 키트 생성
     toolkit = SQLDatabaseToolkit(db=db, llm=llm)
@@ -94,7 +86,7 @@ def few_shot():
     # 생성된 에이전트 반환
     return agent
 
-def cardinaliy():
+def cardinaliy(config):
     # 쿼리 결과를 리스트로 변환하는 함수 정의
     def query_as_list(db, query):
         # 쿼리를 실행하고 결과를 저장
@@ -103,25 +95,20 @@ def cardinaliy():
         res = [el for sub in ast.literal_eval(res) for el in sub if el] # 쿼리 결과를 리스트 형태로 변환하고, 중첩된 리스트를 풀어줌
         res = [re.sub(r"\b\d+\b", "", string).strip() for string in res] # 숫자를 제거하고 공백을 제거한 문자열 리스트로 변환
         # 리스트 반환
-        return list(set(res))
+        return res
     
     # .env 파일에서 환경 변수 로드
     load_dotenv()
     api_key = os.getenv("OPENAPI_API_KEY")
 
     # DB 연결 시 사용할 변수 정의
-    host = '34.173.158.39'
-    port = '3306'
-    username = 'Ssac'
-    password = 'test1234'
-    database_schema = 'classicmodels'
-    mysql_uri = f"mysql+pymysql://{username}:{password}@{host}:{port}/{database_schema}"
+    mysql_uri = f"mysql+pymysql://{config.username}:{config.password}@{config.host}:{config.port}/{config.database_schema}"
     
     # MySQL 데이터베이스 연결 설정
     db = SQLDatabase.from_uri(mysql_uri)
     
     # "employees" 테이블에서 성(lastName) 목록 가져오기
-    artists = query_as_list(db, "SELECT DISTINCT lastName FROM employees")
+    artists = query_as_list(db, "SELECT DISTINCT lastName FROM employees") # 중복을 제거하여 프롬프트에 들어가는 쿼리 줄임
     # "employees" 테이블에서 이름(firstName) 목록 가져오기
     albums = query_as_list(db, "SELECT DISTINCT firstName FROM employees")
     
@@ -146,7 +133,7 @@ def cardinaliy():
     custom_tool_list = [retriever_tool]
 
     # LLM 설정
-    llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0, openai_api_key=api_key)
+    llm = ChatOpenAI(model_name=config.model_name, temperature=0, openai_api_key=api_key)
 
     # SQL 데이터베이스 도구 세트 생성
     toolkit = SQLDatabaseToolkit(db=db, llm=llm)
@@ -170,10 +157,3 @@ def cardinaliy():
     
     # 생성된 에이전트 반환
     return agent
-    
-
-if __name__ == "__main__":
-    agent = cardinaliy()
-    agent.invoke("다이안의 이메일을 알려줘")
-    # agent = few_shot()
-    # agent.invoke("직원이 몇 명이야?")
