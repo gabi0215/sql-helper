@@ -2,14 +2,13 @@ import os
 import json
 from dotenv import load_dotenv
 
-from langchain.utilities import SQLDatabase
-from langchain_experimental.sql import SQLDatabaseChain
 from langchain.schema import Document
-from langchain.vectorstores import FAISS
-from langchain.agents.agent_toolkits import create_retriever_tool
-from langchain.agents import AgentType, create_sql_agent
-from langchain.agents.agent_toolkits import SQLDatabaseToolkit
-# 새로운 방식
+from langchain_community.utilities import SQLDatabase
+from langchain_community.vectorstores import FAISS
+from langchain_community.agent_toolkits.sql.toolkit import SQLDatabaseToolkit
+from langchain_community.agent_toolkits.sql.base import create_sql_agent
+from langchain.tools.retriever import create_retriever_tool
+from langchain.agents import AgentType
 from langchain_openai import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
 
@@ -92,6 +91,6 @@ def few_shot():
     # 생성된 에이전트 반환
     return agent
 
-# if __name__ == "__main__":
-#     agent = few_shot()
-#     agent.run("직원이 몇 명이야?")
+if __name__ == "__main__":
+    agent = few_shot()
+    agent.invoke("직원이 몇 명이야?")
