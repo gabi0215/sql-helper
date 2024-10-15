@@ -12,6 +12,9 @@ from langchain.agents import AgentType
 from langchain_openai import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
 
+import ast
+import re
+
 def few_shot():
     # .env 파일에서 환경 변수 로드
     load_dotenv()
@@ -91,6 +94,86 @@ def few_shot():
     # 생성된 에이전트 반환
     return agent
 
+def cardinaliy():
+    # 쿼리 결과를 리스트로 변환하는 함수 정의
+    def query_as_list(db, query):
+        # 쿼리를 실행하고 결과를 저장
+        res = db.run(query)
+        # 텍스트 전처리
+        res = [el for sub in ast.literal_eval(res) for el in sub if el] # 쿼리 결과를 리스트 형태로 변환하고, 중첩된 리스트를 풀어줌
+        res = [re.sub(r"\b\d+\b", "", string).strip() for string in res] # 숫자를 제거하고 공백을 제거한 문자열 리스트로 변환
+        # 리스트 반환
+        return list(set(res))
+    
+    # .env 파일에서 환경 변수 로드
+    load_dotenv()
+    api_key = os.getenv("OPENAPI_API_KEY")
+
+    # DB 연결 시 사용할 변수 정의
+    host = '34.173.158.39'
+    port = '3306'
+    username = 'Ssac'
+    password = 'test1234'
+    database_schema = 'classicmodels'
+    mysql_uri = f"mysql+pymysql://{username}:{password}@{host}:{port}/{database_schema}"
+    
+    # MySQL 데이터베이스 연결 설정
+    db = SQLDatabase.from_uri(mysql_uri)
+    
+    # "employees" 테이블에서 성(lastName) 목록 가져오기
+    artists = query_as_list(db, "SELECT DISTINCT lastName FROM employees")
+    # "employees" 테이블에서 이름(firstName) 목록 가져오기
+    albums = query_as_list(db, "SELECT DISTINCT firstName FROM employees")
+    
+    # 이름과 성 목록을 합침
+    texts = artists + albums
+
+    # 텍스트 데이터를 벡터로 변환하기 위한 임베딩 생성
+    embeddings = OpenAIEmbeddings()
+    # 임베딩을 사용하여 벡터 데이터베이스 생성
+    vector_db = FAISS.from_texts(texts, embeddings)
+    # 벡터 검색기를 생성
+    retriever = vector_db.as_retriever()
+
+    # 검색기를 사용해 사용자 요청에 따라 이름 검색 도구 생성
+    retriever_tool = create_retriever_tool(
+        retriever,
+        name="name_search", # tool 이름, 모델에 해당 도구 사용요청시 사용
+        description="이름, 성 데이터가 실제로 어떻게 쓰여졌는지 알아내는 데 사용합니다.",
+    )
+    
+    # 사용자 정의 도구 목록 생성
+    custom_tool_list = [retriever_tool]
+
+    # LLM 설정
+    llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0, openai_api_key=api_key)
+
+    # SQL 데이터베이스 도구 세트 생성
+    toolkit = SQLDatabaseToolkit(db=db, llm=llm)
+
+    # 에이전트의 동작 방식을 정의하는 추가 지침 정의
+    custom_suffix = """
+    사용자가 고유명사를 기준으로 필터링해 달라고 요청하는 경우, 먼저 name_search 도구를 사용하여 철자를 확인해야 합니다.
+    그렇지 않으면 데이터베이스의 테이블을 살펴보고 쿼리할 수 있는 항목을 확인할 수 있습니다.
+    그런 다음 가장 관련성이 높은 테이블의 스키마를 쿼리해야 합니다.
+    """
+
+    # SQL 에이전트 생성
+    agent = create_sql_agent(
+        llm=llm,
+        toolkit=toolkit,
+        verbose=True,
+        agent_type=AgentType.OPENAI_FUNCTIONS,
+        extra_tools=custom_tool_list,
+        suffix=custom_suffix,
+    )
+    
+    # 생성된 에이전트 반환
+    return agent
+    
+
 if __name__ == "__main__":
-    agent = few_shot()
-    agent.invoke("직원이 몇 명이야?")
+    agent = cardinaliy()
+    agent.invoke("다이안의 이메일을 알려줘")
+    # agent = few_shot()
+    # agent.invoke("직원이 몇 명이야?")
