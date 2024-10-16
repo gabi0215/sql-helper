@@ -19,7 +19,6 @@ import re
 def few_shot(config):
     # .env 파일에서 환경 변수 로드
     load_dotenv()
-    api_key = os.getenv("OPENAPI_API_KEY")
 
     # JSON 파일 읽기
     with open(config.few_shot_path, "r", encoding="utf-8") as file:
@@ -62,7 +61,8 @@ def few_shot(config):
 
     # OpenAI의 Chat 모델을 사용하여 LLM 정의
     llm = ChatOpenAI(
-        model_name=config.model_name, temperature=0, openai_api_key=api_key
+        model_name=config.model_name,
+        temperature=0,
     )
 
     # SQL 데이터베이스 도구 키트 생성
@@ -107,7 +107,6 @@ def cardinaliy(config):
 
     # .env 파일에서 환경 변수 로드
     load_dotenv()
-    api_key = os.getenv("OPENAPI_API_KEY")
 
     # DB 연결 시 사용할 변수 정의
     mysql_uri = f"mysql+pymysql://{config.username}:{config.password}@{config.host}:{config.port}/{config.database_schema}"
@@ -144,7 +143,8 @@ def cardinaliy(config):
 
     # LLM 설정
     llm = ChatOpenAI(
-        model_name=config.model_name, temperature=0, openai_api_key=api_key
+        model_name=config.model_name,
+        temperature=0,
     )
 
     # SQL 데이터베이스 도구 세트 생성
