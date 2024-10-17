@@ -15,13 +15,13 @@ from langchain_openai import ChatOpenAI
 import ast
 import re
 
+
 def few_shot(config):
     # .env 파일에서 환경 변수 로드
     load_dotenv()
-    api_key = os.getenv("OPENAPI_API_KEY")
-    
+
     # JSON 파일 읽기
-    with open(config.few_shot_path, 'r', encoding='utf-8') as file:
+    with open(config.few_shot_path, "r", encoding="utf-8") as file:
         few_shots = json.load(file)
 
     # OpenAI 임베딩 방법을 사용하여 임베딩 정의, 비용 절감 가능한 부분(Xenova/text-embedding-ada-002 같은 허깅페이스 임베딩 모델을 사용하면 되지 않을까?)
@@ -32,10 +32,10 @@ def few_shot(config):
         Document(page_content=question, metadata={"sql_query": few_shots[question]})
         for question in few_shots.keys()
     ]
-    
+
     # Document에서 FAISS 벡터 데이터베이스 생성
     vector_db = FAISS.from_documents(few_shot_docs, embeddings)
-    
+
     # FAISS 벡터 데이터베이스를 기반으로 검색기 생성
     retriever = vector_db.as_retriever()
 
@@ -49,18 +49,21 @@ def few_shot(config):
     retriever_tool = create_retriever_tool(
         retriever, name="sql_get_similar_examples", description=tool_description
     )
-    
+
     # 커스텀 도구 리스트에 검색 도구 추가
     custom_tool_list = [retriever_tool]
-    
+
     # DB 연결 시 사용할 변수 정의
     mysql_uri = f"mysql+pymysql://{config.username}:{config.password}@{config.host}:{config.port}/{config.database_schema}"
-    
+
     # SQLite 데이터베이스 연결
     db = SQLDatabase.from_uri(mysql_uri)
-    
+
     # OpenAI의 Chat 모델을 사용하여 LLM 정의
-    llm = ChatOpenAI(model_name=config.model_name, temperature=0, openai_api_key=api_key)
+    llm = ChatOpenAI(
+        model_name=config.model_name,
+        temperature=0,
+    )
 
     # SQL 데이터베이스 도구 키트 생성
     toolkit = SQLDatabaseToolkit(db=db, llm=llm)
@@ -82,9 +85,10 @@ def few_shot(config):
         extra_tools=custom_tool_list,
         suffix=custom_suffix,
     )
-    
+
     # 생성된 에이전트 반환
     return agent
+
 
 def cardinaliy(config):
     # 쿼리 결과를 리스트로 변환하는 함수 정의
@@ -92,26 +96,31 @@ def cardinaliy(config):
         # 쿼리를 실행하고 결과를 저장
         res = db.run(query)
         # 텍스트 전처리
-        res = [el for sub in ast.literal_eval(res) for el in sub if el] # 쿼리 결과를 리스트 형태로 변환하고, 중첩된 리스트를 풀어줌
-        res = [re.sub(r"\b\d+\b", "", string).strip() for string in res] # 숫자를 제거하고 공백을 제거한 문자열 리스트로 변환
+        res = [
+            el for sub in ast.literal_eval(res) for el in sub if el
+        ]  # 쿼리 결과를 리스트 형태로 변환하고, 중첩된 리스트를 풀어줌
+        res = [
+            re.sub(r"\b\d+\b", "", string).strip() for string in res
+        ]  # 숫자를 제거하고 공백을 제거한 문자열 리스트로 변환
         # 리스트 반환
         return res
-    
+
     # .env 파일에서 환경 변수 로드
     load_dotenv()
-    api_key = os.getenv("OPENAPI_API_KEY")
 
     # DB 연결 시 사용할 변수 정의
     mysql_uri = f"mysql+pymysql://{config.username}:{config.password}@{config.host}:{config.port}/{config.database_schema}"
-    
+
     # MySQL 데이터베이스 연결 설정
     db = SQLDatabase.from_uri(mysql_uri)
-    
+
     # "employees" 테이블에서 성(lastName) 목록 가져오기
-    artists = query_as_list(db, "SELECT DISTINCT lastName FROM employees") # 중복을 제거하여 프롬프트에 들어가는 쿼리 줄임
+    artists = query_as_list(
+        db, "SELECT DISTINCT lastName FROM employees"
+    )  # 중복을 제거하여 프롬프트에 들어가는 쿼리 줄임
     # "employees" 테이블에서 이름(firstName) 목록 가져오기
     albums = query_as_list(db, "SELECT DISTINCT firstName FROM employees")
-    
+
     # 이름과 성 목록을 합침
     texts = artists + albums
 
@@ -125,15 +134,18 @@ def cardinaliy(config):
     # 검색기를 사용해 사용자 요청에 따라 이름 검색 도구 생성
     retriever_tool = create_retriever_tool(
         retriever,
-        name="name_search", # tool 이름, 모델에 해당 도구 사용요청시 사용
+        name="name_search",  # tool 이름, 모델에 해당 도구 사용요청시 사용
         description="이름, 성 데이터가 실제로 어떻게 쓰여졌는지 알아내는 데 사용합니다.",
     )
-    
+
     # 사용자 정의 도구 목록 생성
     custom_tool_list = [retriever_tool]
 
     # LLM 설정
-    llm = ChatOpenAI(model_name=config.model_name, temperature=0, openai_api_key=api_key)
+    llm = ChatOpenAI(
+        model_name=config.model_name,
+        temperature=0,
+    )
 
     # SQL 데이터베이스 도구 세트 생성
     toolkit = SQLDatabaseToolkit(db=db, llm=llm)
@@ -154,6 +166,6 @@ def cardinaliy(config):
         extra_tools=custom_tool_list,
         suffix=custom_suffix,
     )
-    
+
     # 생성된 에이전트 반환
     return agent
