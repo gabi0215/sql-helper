@@ -1,6 +1,5 @@
 import streamlit as st
 from langchain_community.agent_toolkits import create_sql_agent
-from langchain.chains import create_sql_query_chain
 from langchain_openai import ChatOpenAI
 from langchain_community.utilities import SQLDatabase
 from dotenv import load_dotenv
@@ -12,13 +11,12 @@ load_dotenv()
 
 # GPT 모델 초기화
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 
 # DB 연결 초기화
 URL = os.getenv("URL")
 db = SQLDatabase.from_uri(URL)
-chain = create_sql_query_chain(llm, db)
 
 
 # 세션 상태 초기화
