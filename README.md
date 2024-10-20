@@ -1,8 +1,9 @@
-# sql-helper
+# fastapi
 
 ## 파이썬 환경 설정
 ```
 pip install -r requirements.txt
+변동사항은 파일을 확인해주세요.
 ```
 
 ## 현재 .env 양식
@@ -16,19 +17,16 @@ URL="DB 주소"
 
 ## 실행
 ```
-# RAG
-python main.py
+# cli 명령어 입력 서버연결
+uvicorn test_FastAPI:app --reload
 ```
 
 ```
-# Streamit
-streamlit run streamlit_main.py
+# test_main.py
+MySQL 서버 주소 연결을 위한 get_config 불러오는 파일입니다.
 ```
 
 ```
-# LangGraph
-## langgraph 디렉토리로 이동
-cd langgraph
-## 테스트 진행
-sh langgraph.sh
+실행은 fastapi 폴더내에 test_FastAPI.py로 실행됩니다.
+현재 opneai 버전으로 인한 생성오류문제가 있어 수정이 필요합니다.
 ```
