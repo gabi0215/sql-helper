@@ -13,9 +13,9 @@ from test_main import get_config
 load_dotenv()
 
 # OpenAI API 키 설정
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai_api_key = os.getenv("OPENAI_API_KEY")
 url = os.getenv("URL")
-
+client = openai.Client(api_key=openai_api_key)
 templates = Jinja2Templates(directory="templates")
 
 # FastAPI 앱 생성
@@ -30,8 +30,8 @@ class QueryRequest(BaseModel):
 # 자연어 -> SQL 변환 함수
 def generate_sql(query: str) -> str:
     try:
-        response = openai.ChatCompletion.create(
-            engine="gpt-4",
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
             messages=[
                 {
                     "role": "system",
@@ -39,9 +39,10 @@ def generate_sql(query: str) -> str:
                 },
                 {"role": "user", "content": f"'{query}'에 대한 SQL 쿼리를 작성해줘."},
             ],
-            max_tokens=50,
+            max_tokens=500,
         )
-        return response["choices"][0]["message"]["content"].strip()
+        print(response)
+        return response.choices[0].message.content.strip()
     except Exception as e:
         print(f"OpenAI API오류: {str(e)}")
         raise HTTPException(status_code=500, datail="Error generating SQL from OpenAI")
@@ -50,7 +51,7 @@ def generate_sql(query: str) -> str:
 # MySQL 쿼리 실행 함수
 def execute_sql(sql_query: str):
     try:
-        conn = mysql.connector.connect(**get_config)
+        conn = mysql.connector.connect(get_config())
         cursor = conn.cursor()
         cursor.execute(sql_query)
         result = cursor.fetchall()
@@ -96,11 +97,15 @@ async def query(query: str = Form(...)):
 
     # 자연어 쿼리를 SQL로 변환
     sql_query = generate_sql(query)
+    result_list = sql_query.split(r"```")
+    start_index = result_list[1].find("SELECT")
+    end_index = result_list[1].find(";")
 
     # 변환된 SQL을 MySQL에 실행
-    db_result = execute_sql(sql_query)
+    # db_result = execute_sql(result_list)
 
-    return {"natural_query": query, "sql_query": sql_query, "db_result": db_result}
+    # return {"natural_query": query, "sql_query": sql_query, "db_result": db_result}
+    return result_list[1][start_index : end_index + 1]
 
 
 # 기본 경로 처리
