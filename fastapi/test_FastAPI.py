@@ -22,11 +22,6 @@ templates = Jinja2Templates(directory="templates")
 app = FastAPI()
 
 
-# 요청 모델 정의
-class QueryRequest(BaseModel):
-    query: str
-
-
 # 자연어 -> SQL 변환 함수
 def generate_sql(query: str) -> str:
     try:
@@ -66,27 +61,6 @@ def execute_sql(sql_query: str):
         if conn.is_connected():
             cursor.close()
             conn.close()
-
-
-# POST 요청을 처리하는 엔드포인트
-# @app.post("/query")
-# async def query(request: QueryRequest):
-#     natural_query = request.query
-
-#     if not natural_query:
-#         raise HTTPException(status_code=400, detail="No query provided")
-
-#     # 자연어 쿼리를 SQL로 변환
-#     sql_query = generate_sql(natural_query)
-
-#     # 변환된 SQL을 MySQL에 실행
-#     db_result = execute_sql(sql_query)
-
-#     return {
-#         "natural_query": natural_query,
-#         "sql_query": sql_query,
-#         "db_result": db_result
-#     }
 
 
 # POST 요청을 처리하는 엔드포인트
