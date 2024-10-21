@@ -7,7 +7,6 @@ import mysql.connector
 import openai
 import os
 from dotenv import load_dotenv
-from test_main import get_config
 
 # 환경 변수 로드
 load_dotenv()
