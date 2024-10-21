@@ -46,7 +46,9 @@ def generate_sql(query: str) -> str:
 # MySQL 쿼리 실행 함수
 def execute_sql(sql_query: str):
     try:
-        conn = mysql.connector.connect(get_config()) #MySQL 연결 부분 오류발생(dict형태로 들어가야 동작하는지 확인필요.)
+        conn = mysql.connector.connect(
+            get_config()
+        )  # MySQL 연결 부분 오류발생(dict형태로 들어가야 동작하는지 확인필요.)
         cursor = conn.cursor()
         cursor.execute(sql_query)
         result = cursor.fetchall()
