@@ -2,8 +2,6 @@ import os
 import json
 from dotenv import load_dotenv
 
-from langchain_core.caches import InMemoryCache
-from langchain_core.globals import set_llm_cache
 from langchain.schema import Document
 from langchain_community.utilities import SQLDatabase
 from langchain_community.vectorstores import FAISS
@@ -17,6 +15,7 @@ from langchain_openai import ChatOpenAI
 import ast
 import re
 
+
 # 환경 변수 로드 및 DB 연결 설정 함수
 def load_env_db():
     # .env 파일에서 환경 변수 로드
@@ -27,6 +26,7 @@ def load_env_db():
     db = SQLDatabase.from_uri(URL)
     return db
 
+
 # 임베딩 및 검색기 생성 함수
 def create_retriever_from_texts(texts):
     embeddings = OpenAIEmbeddings()
@@ -34,12 +34,14 @@ def create_retriever_from_texts(texts):
     retriever = vector_db.as_retriever()
     return retriever
 
+
 # Document 리스트를 사용하여 검색기 생성 함수
 def create_retriever_from_documents(documents):
     embeddings = OpenAIEmbeddings()
     vector_db = FAISS.from_documents(documents, embeddings)
     retriever = vector_db.as_retriever()
     return retriever
+
 
 # 에이전트 생성 함수
 def create_agent(llm, db, tools, suffix):
@@ -53,6 +55,7 @@ def create_agent(llm, db, tools, suffix):
         suffix=suffix,
     )
     return agent
+
 
 def few_shot(config):
     # DB 연결 설정
@@ -73,9 +76,9 @@ def few_shot(config):
 
     # 검색 도구 생성
     retriever_tool = create_retriever_tool(
-        retriever, 
-        name="sql_get_similar_examples", 
-        description="이 도구는 유사한 예시를 이해하여 사용자 질문에 적용하는 데 도움이 됩니다."
+        retriever,
+        name="sql_get_similar_examples",
+        description="이 도구는 유사한 예시를 이해하여 사용자 질문에 적용하는 데 도움이 됩니다.",
     )
 
     # LLM 설정
@@ -91,6 +94,7 @@ def few_shot(config):
 
     # 에이전트 생성 및 반환
     return create_agent(llm, db, [retriever_tool], custom_suffix)
+
 
 def cardinality(config):
     # DB 연결 설정
@@ -113,9 +117,9 @@ def cardinality(config):
 
     # 검색 도구 생성
     retriever_tool = create_retriever_tool(
-        retriever, 
-        name="name_search", 
-        description="이름, 성 데이터가 실제로 어떻게 쓰여졌는지 알아내는 데 사용합니다."
+        retriever,
+        name="name_search",
+        description="이름, 성 데이터가 실제로 어떻게 쓰여졌는지 알아내는 데 사용합니다.",
     )
 
     # LLM 설정

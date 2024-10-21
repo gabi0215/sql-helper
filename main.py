@@ -1,6 +1,7 @@
 import argparse
 from sql_rag import few_shot, cardinality
 
+
 def get_config():
     # parser 생성
     parser = argparse.ArgumentParser(
@@ -14,6 +15,7 @@ def get_config():
     config = parser.parse_args()
 
     return config
+
 
 if __name__ == "__main__":
     # argparser 불러오기

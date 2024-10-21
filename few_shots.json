@@ -10,5 +10,5 @@
     "재고가 5000개 이상인 모든 제품을 조회하세요.": "SELECT * FROM products WHERE quantityInStock > 5000;",
     "총 결제 금액이 가장 많은 상위 5명의 고객을 조회하세요.": "SELECT customerNumber, SUM(amount) AS TotalPayments FROM payments GROUP BY customerNumber ORDER BY TotalPayments DESC LIMIT 5;",
     "2003년에 배송된 주문을 조회하세요.": "SELECT * FROM orders WHERE YEAR(shippedDate) = 2003;",
-    "직원의 총 수를 구하세요.": "SELECT COUNT(*) FROM employees;"
+    "직원의 총 수를 구하세요.": "SELECT COUNT(*) FROM employees;",
 }
