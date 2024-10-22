@@ -22,11 +22,10 @@ uvicorn test_FastAPI:app --reload
 ```
 
 ```
-# test_main.py
-MySQL 서버 주소 연결을 위한 get_config 불러오는 파일입니다.
+fastapi 폴더내에 test_FastAPI.py로 실행됩니다.
 ```
 
 ```
-실행은 fastapi 폴더내에 test_FastAPI.py로 실행됩니다.
-현재 opneai 버전으로 인한 생성오류문제가 있어 수정이 필요합니다.
+openai 를 통한 쿼리문 생성 오류 해결.
+mysql.connector 를 통한 연결오류.
 ```

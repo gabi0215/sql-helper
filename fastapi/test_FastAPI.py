@@ -7,13 +7,26 @@ import mysql.connector
 import openai
 import os
 from dotenv import load_dotenv
+from urllib.parse import urlparse
 
 # 환경 변수 로드
 load_dotenv()
 
 # OpenAI API 키 설정
 openai_api_key = os.getenv("OPENAI_API_KEY")
-url = os.getenv("URL")
+db_url = os.getenv("URL")
+# URL 파싱 작업
+url = urlparse(db_url)
+
+# 파싱된 정보 기반으로 딕셔너리 생성
+db_config = {
+    "user": url.username,
+    "password": url.password,
+    "host": url.hostname,
+    "port": url.port,
+    "database": url.path[1:],  # 출력시 '/' 맨 앞 부분 제거
+}
+
 client = openai.Client(api_key=openai_api_key)
 templates = Jinja2Templates(directory="templates")
 
@@ -46,10 +59,13 @@ def generate_sql(query: str) -> str:
 def execute_sql(sql_query: str):
     try:
         conn = mysql.connector.connect(
-            get_config()
+            **db_config
         )  # MySQL 연결 부분 오류발생(dict형태로 들어가야 동작하는지 확인필요.)
+        # cursor db에서 쿼리 실행 및 결과 가져오기 위한 객체입니다.
         cursor = conn.cursor()
+        # SQL 쿼리를 실행합니다.
         cursor.execute(sql_query)
+        # fecthall: 쿼리 결과의 모든 행을 리스트로 가져옵니다.
         result = cursor.fetchall()
         return result
     except mysql.connector.Error as e:
@@ -60,6 +76,7 @@ def execute_sql(sql_query: str):
         raise HTTPException(status_code=500, detail="General error occurred")
     finally:
         if conn.is_connected():
+            # 작업이 끝나면 db연결을 끊어줍니다.
             cursor.close()
             conn.close()
 
@@ -77,10 +94,10 @@ async def query(query: str = Form(...)):
     end_index = result_list[1].find(";")
 
     # 변환된 SQL을 MySQL에 실행
-    # db_result = execute_sql(result_list)
+    db_result = execute_sql(result_list)
 
-    # return {"natural_query": query, "sql_query": sql_query, "db_result": db_result}
-    return result_list[1][start_index : end_index + 1]
+    return {"natural_query": query, "sql_query": sql_query, "db_result": db_result}
+    # return result_list[1][start_index : end_index + 1]
 
 
 # 기본 경로 처리
