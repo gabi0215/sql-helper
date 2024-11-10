@@ -2,12 +2,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi import FastAPI, Request
 from fastapi import Form
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
-import mysql.connector
 import openai
-import os
+import os, re
 from dotenv import load_dotenv
-from urllib.parse import urlparse
+import pymysql
 
 # 환경 변수 로드
 load_dotenv()
@@ -15,18 +13,24 @@ load_dotenv()
 # OpenAI API 키 설정
 openai_api_key = os.getenv("OPENAI_API_KEY")
 db_url = os.getenv("URL")
-# URL 파싱 작업
-url = urlparse(db_url)
 
-# 파싱된 정보 기반으로 딕셔너리 생성
+
+username = os.getenv("username")
+password = os.getenv("password")
+hostname = os.getenv("hostname")
+port = int(os.getenv("port"))
+database = os.getenv("database")
+
+# print(url.username,url.password,url.hostname,url.port,url.path[1:])
+# # 파싱된 정보 기반으로 딕셔너리 생성
 db_config = {
-    "user": url.username,
-    "password": url.password,
-    "host": url.hostname,
-    "port": url.port,
-    "database": url.path[1:],  # 출력시 '/' 맨 앞 부분 제거
+    "user": username,
+    "password": password,
+    "host": hostname,
+    "port": port,
+    "database": database,  # 출력시 '/' 맨 앞 부분 제거
 }
-
+print(db_config)
 client = openai.Client(api_key=openai_api_key)
 templates = Jinja2Templates(directory="templates")
 
@@ -42,7 +46,7 @@ def generate_sql(query: str) -> str:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant that converts natural language to SQL queries.",
+                    "content": "You are a helpful assistant that converts natural language to SQL queries. You have to answer with SQL query ONLY.",
                 },
                 {"role": "user", "content": f"'{query}'에 대한 SQL 쿼리를 작성해줘."},
             ],
@@ -55,30 +59,35 @@ def generate_sql(query: str) -> str:
         raise HTTPException(status_code=500, datail="Error generating SQL from OpenAI")
 
 
-# MySQL 쿼리 실행 함수
+# pymySQL 쿼리 실행 함수
 def execute_sql(sql_query: str):
+    conn = None
+    cursor = None
     try:
-        conn = mysql.connector.connect(
-            **db_config
-        )  # MySQL 연결 부분 오류발생(dict형태로 들어가야 동작하는지 확인필요.)
+        conn = pymysql.connect(**db_config)
+
         # cursor db에서 쿼리 실행 및 결과 가져오기 위한 객체입니다.
         cursor = conn.cursor()
+
         # SQL 쿼리를 실행합니다.
         cursor.execute(sql_query)
+
         # fecthall: 쿼리 결과의 모든 행을 리스트로 가져옵니다.
         result = cursor.fetchall()
+
         return result
-    except mysql.connector.Error as e:
+    except pymysql.MySQLError as e:
         print(f"MySQL 오류: {str(e)}")
         raise HTTPException(status_code=500, detail="Error executing SQL query")
     except Exception as e:
         print(f"일반 오류: {str(e)}")
         raise HTTPException(status_code=500, detail="General error occurred")
     finally:
-        if conn.is_connected():
-            # 작업이 끝나면 db연결을 끊어줍니다.
-            cursor.close()
-            conn.close()
+        # conn이 None이 아닐 경우에만 .close() 호출
+        if conn:
+            if cursor:  # cursor가 None이 아니면 닫기
+                cursor.close()
+            conn.close()  # conn이 None이 아니면 닫기
 
 
 # POST 요청을 처리하는 엔드포인트
@@ -89,12 +98,16 @@ async def query(query: str = Form(...)):
 
     # 자연어 쿼리를 SQL로 변환
     sql_query = generate_sql(query)
-    result_list = sql_query.split(r"```")
-    start_index = result_list[1].find("SELECT")
-    end_index = result_list[1].find(";")
+    print(sql_query)
+    pattern = r"(?<=\n).*(?=;)"
+    result = re.search(pattern, sql_query).group()
+    # result_list = sql_query.split(r"```")
+    # start_index = result_list[1].find("SELECT")
+    # end_index = result_list[1].find(";")
 
     # 변환된 SQL을 MySQL에 실행
-    db_result = execute_sql(result_list)
+    print(result)
+    db_result = execute_sql(result)
 
     return {"natural_query": query, "sql_query": sql_query, "db_result": db_result}
     # return result_list[1][start_index : end_index + 1]
@@ -103,7 +116,7 @@ async def query(query: str = Form(...)):
 # 기본 경로 처리
 @app.get("/")
 async def read_root():
-    return {"message": "Welcome to the FastAPI application!"}
+    return {"message": "Welcome to the slq-helper application!"}
 
 
 # 쿼리를 입력하는 HTML구성 창으로 접속 처리
