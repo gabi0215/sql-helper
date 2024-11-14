@@ -30,6 +30,8 @@ def make_graph() -> CompiledStateGraph:
 
     workflow.add_node("SQL 쿼리문 생성", query_creation)
 
+    workflow.add_edge("Table 선택", "SQL 쿼리문 생성")
+
     # 시작점을 설정합니다.
     workflow.set_entry_point("질문 평가")
 

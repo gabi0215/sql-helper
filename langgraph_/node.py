@@ -1,4 +1,5 @@
 from langchain_core.vectorstores import VectorStore
+from langchain_community.vectorstores import FAISS
 
 from typing import TypedDict, List, Dict
 from task import (
@@ -8,6 +9,9 @@ from task import (
     extract_context,
     create_query,
 )
+
+# FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다.
+from faiss_init import get_vector_stores
 
 
 # GrpahState 정의
@@ -24,7 +28,8 @@ class GraphState(TypedDict):
     table_contexts_ids: List[int]
     # TODO
     # 지금은 FAISS 벡터 DB를 쓰기에 아래와 같이 딕셔너리에 넣어놓지만, Redis DB 서버를 만들어서 이용할 경우에는 index가 들어가야 한다.
-    vector_store_dict: Dict[str, VectorStore]  # RAG를 위한 벡터 DB
+    # FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다. 노드 안에서 객체를 불러오는 것으로 한다.
+    # vector_store_dict: Dict[str, VectorStore | FAISS]  # RAG를 위한 벡터 DB
 
 
 ########################### 정의된 노드 ###########################
@@ -70,7 +75,9 @@ def table_selection(state: GraphState) -> GraphState:
     """
     user_qusetion = state["user_question"]
     context_cnt = state["context_cnt"]
-    vector_store = state["vector_store_dict"]["table_ddl"]
+    vector_store = get_vector_stores()["table_info"]  # table_ddl
+    # FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다.
+    # vector_store = state["vector_store_dict"]["table_info"] # table_ddl
     # 사용자 질문과 관련성이 있는 테이블+컬럼정보를 검색
     table_contexts = select_relevant_tables(
         user_question=user_qusetion, context_cnt=context_cnt, vector_store=vector_store

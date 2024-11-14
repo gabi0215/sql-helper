@@ -2,4 +2,4 @@ python langgraph_main.py\
     --recursion-limit 50\
     --thread-id "TEST_RUN"\
     --model-name "gpt-4o-mini"\
-    --user-question "강호준이 최근 일주일간 몇캔의 닥터페퍼를 마셨는지 알려줘"
+    --user-question "common_db의 전체 주문 중 환불된 주문의 비율은 얼마인가요?"
