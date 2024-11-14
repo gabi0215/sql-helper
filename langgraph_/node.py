@@ -1,11 +1,17 @@
-from typing import TypedDict
-from task import (
+from langchain_core.vectorstores import VectorStore
+from langchain_community.vectorstores import FAISS
+
+from typing import TypedDict, List, Dict
+from .task import (
     evaluate_user_question,
     simple_conversation,
-    do_embodiment,
-    do_extraction,
-    do_category_classification,
+    select_relevant_tables,
+    extract_context,
+    create_query,
 )
+
+# FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다.
+from .faiss_init import get_vector_stores
 
 
 # GrpahState 정의
@@ -13,11 +19,17 @@ class GraphState(TypedDict):
     # Warning!
     # 그래프 내에서 사용될 모든 key값을 정의해야 오류가 나지 않는다.
     user_question: str  # 사용자의 질문
-    user_question_eval: str  # 사용자 질문 평가
-    embodied_question: str  # 사용자의 구체화 된 질문
-    extracted_data: list[str]  # 사용자의 질문에서 추출된 정보
-    category: str  # 사용자의 질문에 대해 대응해야하는 카테고리
-    final_answer: str  # 서비스 흐름에서 사용자에게 전달될 최종 답변
+    user_question_eval: str  # 사용자의 질문이 SQL 관련 질문인지 여부
+    final_answer: str
+    # TODO
+    # context_cnt가 동적으로 조절 되도록 알고리즘을 짜야 한다.
+    context_cnt: int  # 사용자의 질문에 대답하기 위해서 정보를 가져올 context 갯수
+    table_contexts: List[str]
+    table_contexts_ids: List[int]
+    # TODO
+    # 지금은 FAISS 벡터 DB를 쓰기에 아래와 같이 딕셔너리에 넣어놓지만, Redis DB 서버를 만들어서 이용할 경우에는 index가 들어가야 한다.
+    # FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다. 노드 안에서 객체를 불러오는 것으로 한다.
+    # vector_store_dict: Dict[str, VectorStore | FAISS]  # RAG를 위한 벡터 DB
 
 
 ########################### 정의된 노드 ###########################
@@ -37,48 +49,6 @@ def question_evaluation(state: GraphState) -> GraphState:
     return GraphState(user_question_eval=user_question_eval)  # type: ignore
 
 
-def embodying_and_extracting(state: GraphState) -> GraphState:
-    """사용자의 질문을 가지고 구체화하고 정보를 추출하는 작업을 진행하는 노드입니다.
-
-    Args:
-        state (GraphState): LangGraph에서 쓰이는 그래프 상태
-
-    Returns:
-        GraphState: 사용자의 질문을 구체화한 결과와 사용자의 질문에서 추출된 정보 추가된 그래프 상태
-    """
-    user_question = state["user_question"]
-    # 사용자 질문을 구체화
-    embodied_question = do_embodiment(user_question)
-    # 사용자 질문에서 필요 정보 추출
-    extracted_data = do_extraction(user_question)
-
-    return GraphState(
-        embodied_question=embodied_question, extracted_data=extracted_data
-    )  # type: ignore
-
-
-def classify_question_category(state: GraphState) -> GraphState:
-    """사용자의 질문 및 기타 정보(현재 버전: 구체화된 질문, 추출된 정보)를 가지고
-    사용자의 질문을 기능적으로 분류하는 노드입니다.
-
-    Args:
-        state (GraphState): LangGraph에서 쓰이는 그래프 상태
-
-    Returns:
-        GraphState: 사용자의 질문을 기능적으로 분류한 결과가 추가된 그래프 상태
-    """
-    user_question = state["user_question"]
-    embodied_question = state["embodied_question"]
-    extracted_data = state["extracted_data"]
-
-    # 사용자 질문과 구체화 정보,필요 정보들을 고려하여 분류
-    category = do_category_classification(
-        user_question, embodied_question, extracted_data
-    )
-
-    return GraphState(category=category)  # type: ignore
-
-
 def non_sql_conversation(state: GraphState) -> GraphState:
     """일상적인 대화를 진행하는 노드
 
@@ -94,71 +64,58 @@ def non_sql_conversation(state: GraphState) -> GraphState:
     return GraphState(final_answer=final_answer)  # type: ignore
 
 
-def crete_query(state: GraphState) -> GraphState:
-    """쿼리문 생성 기능의 시작점이 되는 노드
+def table_selection(state: GraphState) -> GraphState:
+    """사용자의 질문과 연관된 테이블 메타 데이터를 검색하고 검수하는 노드
 
     Args:
         state (GraphState): LangGraph에서 쓰이는 그래프 상태
 
     Returns:
-        GraphState: _description_
+        GraphState: 검색된 context들과 검수를 통과한 context의 index list가 추가된 그래프 상태
     """
-    final_answer = state["category"]
-    return GraphState(final_answer=final_answer)  # type: ignore
+    user_qusetion = state["user_question"]
+    context_cnt = state["context_cnt"]
+    vector_store = get_vector_stores()["table_info"]  # table_ddl
+    # FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다.
+    # vector_store = state["vector_store_dict"]["table_info"] # table_ddl
+    # 사용자 질문과 관련성이 있는 테이블+컬럼정보를 검색
+    table_contexts = select_relevant_tables(
+        user_question=user_qusetion, context_cnt=context_cnt, vector_store=vector_store
+    )
+    # 검색된 context를 검수
+    table_contexts_ids = extract_context(
+        user_question=user_qusetion, table_contexts=table_contexts
+    )
+    return GraphState(
+        table_contexts=table_contexts,
+        table_contexts_ids=table_contexts_ids,
+    )  # type: ignore
 
 
-def explain_query(state: GraphState) -> GraphState:
-    """쿼리문 설명 기능의 시작점이 되는 노드
+def query_creation(state: GraphState) -> GraphState:
+    """사용자 질문을 포함한 여러 정보들을 가지고 SQL 쿼리문을 생성하는 노드
 
     Args:
         state (GraphState): LangGraph에서 쓰이는 그래프 상태
 
     Returns:
-        GraphState: _description_
+        GraphState: 사용자의 질문에 대한 SQL 쿼리문이 추가된 그래프 상태
     """
-    final_answer = state["category"]
-    return GraphState(final_answer=final_answer)  # type: ignore
+    user_qusetion = state["user_question"]
+    table_contexts = state["table_contexts"]
+    table_contexts_ids = state["table_contexts_ids"]
+
+    sql_result = create_query(user_qusetion, table_contexts, table_contexts_ids)
+
+    # TODO
+    # 현재 SQL 쿼리문만을 출력하는 것이 중간 목표이기에 final_answer 필드에 저장했지만,
+    # 향후에는 SQL 쿼리문을 저장하는 필드에 저장한 뒤, flow를 이어나가야 한다.
+    return GraphState(
+        final_answer=sql_result,
+    )  # type: ignore
 
 
-def explain_table(state: GraphState) -> GraphState:
-    """테이블 설명 기능의 시작점이 되는 노드
-
-    Args:
-        state (GraphState): LangGraph에서 쓰이는 그래프 상태
-
-    Returns:
-        GraphState: _description_
-    """
-    final_answer = state["category"]
-    return GraphState(final_answer=final_answer)  # type: ignore
-
-
-def correct_query_grammar(state: GraphState) -> GraphState:
-    """쿼리문 문법 검증의 시작점이 되는 노드
-
-    Args:
-        state (GraphState): LangGraph에서 쓰이는 그래프 상태
-
-    Returns:
-        GraphState: _description_
-    """
-    final_answer = state["category"]
-    return GraphState(final_answer=final_answer)  # type: ignore
-
-
-def guide_utilization(state: GraphState) -> GraphState:
-    """테이블 및 컬럼 활용 안내 기능의 시작점이 되는 노드
-
-    Args:
-        state (GraphState): LangGraph에서 쓰이는 그래프 상태
-
-    Returns:
-        GraphState: _description_
-    """
-    final_answer = state["category"]
-    return GraphState(final_answer=final_answer)  # type: ignore
-
-
+################### ROUTERS ###################
 def user_question_checker(state: GraphState) -> str:
     """그래프 상태에서 사용자의 질문 분류 결과를 가져오는 노드입니다.
 
@@ -169,15 +126,3 @@ def user_question_checker(state: GraphState) -> str:
         str: 사용자의 질문 분류 결과 ("1" or "0")
     """
     return state["user_question_eval"]
-
-
-def category_checker(state: GraphState) -> str:
-    """사용자의 질문을 기능적으로 분류한 결과를 반환하는 노드입니다.
-
-    Args:
-        state (GraphState): LangGraph에서 쓰이는 그래프 상태
-
-    Returns:
-        str: 기능 분류 결과
-    """
-    return state["category"]
