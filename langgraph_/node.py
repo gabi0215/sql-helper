@@ -2,7 +2,7 @@ from langchain_core.vectorstores import VectorStore
 from langchain_community.vectorstores import FAISS
 
 from typing import TypedDict, List, Dict
-from task import (
+from .task import (
     evaluate_user_question,
     simple_conversation,
     select_relevant_tables,
@@ -11,7 +11,7 @@ from task import (
 )
 
 # FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다.
-from faiss_init import get_vector_stores
+from .faiss_init import get_vector_stores
 
 
 # GrpahState 정의

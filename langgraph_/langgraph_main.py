@@ -1,9 +1,9 @@
 import argparse
 
-from node import GraphState
-from graph import make_graph
-from utils import get_runnable_config
-from faiss_init import get_vector_stores
+from .node import GraphState
+from .graph import make_graph
+from .utils import get_runnable_config
+from .faiss_init import get_vector_stores
 
 
 def get_config():
@@ -31,6 +31,23 @@ def get_config():
     config = parser.parse_args()
 
     return config
+
+
+def text2sql(user_input):
+    # config 설정
+    config = get_config()
+    runnable_config = get_runnable_config(
+        recursion_limit=config.recursion_limit, thread_id=config.thread_id
+    )
+
+    # graph 생성
+    graph = make_graph()
+
+    # 입력을 위해 그래프 상태 만들기
+    inputs = GraphState(user_question=user_input, context_cnt=config.context_cnt)  # type: ignore
+    outputs = graph.invoke(input=inputs, config=runnable_config)
+
+    return outputs["final_answer"]
 
 
 if __name__ == "__main__":

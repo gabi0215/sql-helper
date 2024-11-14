@@ -2,7 +2,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.checkpoint.memory import MemorySaver
 
-from node import (
+from .node import (
     GraphState,
     question_evaluation,
     table_selection,
