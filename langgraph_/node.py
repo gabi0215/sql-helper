@@ -1,10 +1,9 @@
-from typing import TypedDict
+from typing import TypedDict, List
 from task import (
     evaluate_user_question,
     simple_conversation,
     do_embodiment,
     do_extraction,
-    do_category_classification,
 )
 
 
@@ -13,11 +12,13 @@ class GraphState(TypedDict):
     # Warning!
     # 그래프 내에서 사용될 모든 key값을 정의해야 오류가 나지 않는다.
     user_question: str  # 사용자의 질문
-    user_question_eval: str  # 사용자 질문 평가
-    embodied_question: str  # 사용자의 구체화 된 질문
-    extracted_data: list[str]  # 사용자의 질문에서 추출된 정보
-    category: str  # 사용자의 질문에 대해 대응해야하는 카테고리
-    final_answer: str  # 서비스 흐름에서 사용자에게 전달될 최종 답변
+    user_question_eval: str  # 사용자의 질문이 SQL 관련 질문인지 여부
+    final_answer: str
+    # TODO
+    # context_cnt가 동적으로 조절 되도록 알고리즘을 짜야 한다.
+    context_cnt: int  # 사용자의 질문에 대답하기 위해서 정보를 가져올 context 갯수
+    table_contexts: List[str]
+    table_contexts_ids: List[int]
 
 
 ########################### 정의된 노드 ###########################
@@ -57,28 +58,6 @@ def embodying_and_extracting(state: GraphState) -> GraphState:
     )  # type: ignore
 
 
-def classify_question_category(state: GraphState) -> GraphState:
-    """사용자의 질문 및 기타 정보(현재 버전: 구체화된 질문, 추출된 정보)를 가지고
-    사용자의 질문을 기능적으로 분류하는 노드입니다.
-
-    Args:
-        state (GraphState): LangGraph에서 쓰이는 그래프 상태
-
-    Returns:
-        GraphState: 사용자의 질문을 기능적으로 분류한 결과가 추가된 그래프 상태
-    """
-    user_question = state["user_question"]
-    embodied_question = state["embodied_question"]
-    extracted_data = state["extracted_data"]
-
-    # 사용자 질문과 구체화 정보,필요 정보들을 고려하여 분류
-    category = do_category_classification(
-        user_question, embodied_question, extracted_data
-    )
-
-    return GraphState(category=category)  # type: ignore
-
-
 def non_sql_conversation(state: GraphState) -> GraphState:
     """일상적인 대화를 진행하는 노드
 
@@ -94,71 +73,7 @@ def non_sql_conversation(state: GraphState) -> GraphState:
     return GraphState(final_answer=final_answer)  # type: ignore
 
 
-def crete_query(state: GraphState) -> GraphState:
-    """쿼리문 생성 기능의 시작점이 되는 노드
-
-    Args:
-        state (GraphState): LangGraph에서 쓰이는 그래프 상태
-
-    Returns:
-        GraphState: _description_
-    """
-    final_answer = state["category"]
-    return GraphState(final_answer=final_answer)  # type: ignore
-
-
-def explain_query(state: GraphState) -> GraphState:
-    """쿼리문 설명 기능의 시작점이 되는 노드
-
-    Args:
-        state (GraphState): LangGraph에서 쓰이는 그래프 상태
-
-    Returns:
-        GraphState: _description_
-    """
-    final_answer = state["category"]
-    return GraphState(final_answer=final_answer)  # type: ignore
-
-
-def explain_table(state: GraphState) -> GraphState:
-    """테이블 설명 기능의 시작점이 되는 노드
-
-    Args:
-        state (GraphState): LangGraph에서 쓰이는 그래프 상태
-
-    Returns:
-        GraphState: _description_
-    """
-    final_answer = state["category"]
-    return GraphState(final_answer=final_answer)  # type: ignore
-
-
-def correct_query_grammar(state: GraphState) -> GraphState:
-    """쿼리문 문법 검증의 시작점이 되는 노드
-
-    Args:
-        state (GraphState): LangGraph에서 쓰이는 그래프 상태
-
-    Returns:
-        GraphState: _description_
-    """
-    final_answer = state["category"]
-    return GraphState(final_answer=final_answer)  # type: ignore
-
-
-def guide_utilization(state: GraphState) -> GraphState:
-    """테이블 및 컬럼 활용 안내 기능의 시작점이 되는 노드
-
-    Args:
-        state (GraphState): LangGraph에서 쓰이는 그래프 상태
-
-    Returns:
-        GraphState: _description_
-    """
-    final_answer = state["category"]
-    return GraphState(final_answer=final_answer)  # type: ignore
-
-
+################### ROUTERS ###################
 def user_question_checker(state: GraphState) -> str:
     """그래프 상태에서 사용자의 질문 분류 결과를 가져오는 노드입니다.
 
@@ -169,15 +84,3 @@ def user_question_checker(state: GraphState) -> str:
         str: 사용자의 질문 분류 결과 ("1" or "0")
     """
     return state["user_question_eval"]
-
-
-def category_checker(state: GraphState) -> str:
-    """사용자의 질문을 기능적으로 분류한 결과를 반환하는 노드입니다.
-
-    Args:
-        state (GraphState): LangGraph에서 쓰이는 그래프 상태
-
-    Returns:
-        str: 기능 분류 결과
-    """
-    return state["category"]
