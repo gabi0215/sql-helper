@@ -71,6 +71,77 @@ def simple_conversation(user_question: str) -> str:
     return output
 
 
+def refine_user_question(user_question: str) -> str:
+    """사용자의 질문을 분석하고 구체화하는 함수입니다.
+
+    Args:
+        user_question (str): 사용자의 질문
+
+    Returns:
+        str: 구체화된 사용자 질문
+    """
+
+    output_parser = StrOutputParser()
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+    ANALYZEPROMPT = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """당신은 사용자의 질문을 분석하여 데이터베이스 쿼리에 필요한 요소들을 파악하는 전문가입니다.
+                다음과 같은 요소들을 체계적으로 분석해주세요:
+                - 질문의 핵심 의도
+                - 필요한 데이터 항목
+                - 시간적 범위
+                - 데이터 필터링 조건
+                - 데이터 정렬 및 그룹화 요구사항""",
+            ),
+            (
+                "human",
+                """사용자 질문: {user_question}
+                
+                아래 형식으로 상세하게 분석해주세요:
+                - 주요 의도: 사용자가 질문의 핵심적으로 묻고자 하는 바는 무엇인가요?
+                - 필요한 데이터 항목: 사용자가 원하는 구체적인 데이터나 정보는 무엇인가요?
+                - 시간적 범위: 사용자가 원하는 시간적 범위는 어떻게 되나요?
+                - 데이터 필터링 조건: 사용자가 요청한 데이터에는 어떤 조건이나 필터링이 필요한가요?
+                - 데이터 정렬 및 그룹화: 사용자가 원하는 데이터의 정렬 기준이나 그룹화 방식은 무엇인가요?""",
+            ),
+        ]
+    )
+
+    analyze_chain = ANALYZEPROMPT | llm | output_parser
+    analyze_question = analyze_chain.invoke({"user_question": user_question})
+
+    REFINEPROMPT = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """당신은 사용자의 질문을 더 명확하고 구체적으로 다듬는 전문가입니다.
+                주어진 질문을 분석하여 모호한 부분을 찾고, 더 구체적인 질문으로 재구성하세요.
+                """,
+            ),
+            (
+                "human",
+                """사용자 질문: 
+                {user_question}
+                
+                사용자 질문 분석: 
+                {question_analyze}
+                
+                구체화된 질문:""",
+            ),
+        ]
+    )
+
+    refine_chain = REFINEPROMPT | llm | output_parser
+    refine_question = refine_chain.invoke(
+        {"user_question": user_question, "question_analyze": analyze_question}
+    )
+
+    return refine_question
+
+
 def select_relevant_tables(
     user_question: str, context_cnt: int, vector_store: VectorStore
 ) -> List[str]:

@@ -8,6 +8,7 @@ from .task import (
     select_relevant_tables,
     extract_context,
     create_query,
+    refine_user_question,
 )
 
 # FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다.
@@ -62,6 +63,21 @@ def non_sql_conversation(state: GraphState) -> GraphState:
     final_answer = simple_conversation(user_question)
 
     return GraphState(final_answer=final_answer)  # type: ignore
+
+
+def question_refine(state: GraphState) -> GraphState:
+    """질문 세분화와 구체화를 진행하는 노드
+
+    Args:
+        state (GraphState): LangGraph에서 쓰이는 그래프 상태
+
+    Returns:
+        GraphState: 사용자의 질문에 대한 대답이 추가된 그래프 상태
+    """
+    user_question = state["user_question"]
+    user_question = refine_user_question(user_question)
+
+    return GraphState(user_question=user_question)
 
 
 def table_selection(state: GraphState) -> GraphState:

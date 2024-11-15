@@ -1,4 +1,4 @@
-python langgraph_main.py\
+python -m langgraph_.langgraph_main\
     --recursion-limit 50\
     --thread-id "TEST_RUN"\
     --model-name "gpt-4o-mini"\
