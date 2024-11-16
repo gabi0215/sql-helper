@@ -220,7 +220,7 @@ def extract_context(user_question: str, table_contexts: List[str]) -> List[int]:
 
     structured_llm = llm.with_structured_output(context_list)
     context = ""
-    for idx, table_info in enumerate(table_contexts):
+    for table_info in table_contexts:
         context += f"{table_info}\n\n"
 
     chain = prompt | structured_llm
