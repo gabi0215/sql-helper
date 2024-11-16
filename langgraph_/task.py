@@ -182,33 +182,50 @@ def extract_context(user_question: str, table_contexts: List[str]) -> List[int]:
         [
             (
                 "system",
-                "당신은 사용자의 입력을 SQL문으로 바꾸어주는 조직의 팀원입니다. 당신에게는 사용자의 입력(user_question)과 검색을 통해 가져온 context에 번호가 매겨진 채로 주어질 것 입니다. 당신의 임무는 사용자의 입력을 기반으로 SQL을 생성할 때, 필요한 context의 번호를 추출하여 리스트의 형태로 반환하는 것 입니다. 만약 모든 context가 필요 없다면, 빈 리스트를 반환해도 됩니다.",
+                """당신은 사용자의 질문을 SQL로 변환하는 데 필요한 정보를 식별하는 전문가입니다.
+                
+                당신의 임무:
+                1. 주어진 사용자 질문을 분석하여 SQL 생성에 필요한 정보들을 식별
+                2. 필요한 정보의 인덱스를 정수 리스트로 반환
+
+                입력 형식:
+                - 사용자 질문: SQL로 변환이 필요한 사용자의 질문
+                - context: 사용자 질문을 SQL문으로 변환할 때 사용할 정보들
+
+                반환 형식:
+                - 필요한 context의 인덱스를 담은 정수 리스트
+                - 필요한 context가 없는 경우 빈 리스트
+
+                주의사항:
+                - 인덱스는 제시된 순서대로 정렬하여 반환합니다
+                - SQL 생성에 확실히 필요한 정보만 선택합니다""",
             ),
             (
                 "human",
-                "user_question:\n{user_question}\n\ncontext:\n{table_context}",
+                """user_question:
+                {user_question}
+                
+                context:
+                {context}""",
             ),
         ]
     )
+
     llm = ChatOpenAI(model="gpt-4o-mini")
 
-    # LLM의 Structured Output을 위한 Pydantic class
     class context_list(BaseModel):
-        """Index list of the context which is necessary for answering user_question."""
+        """사용자 질문에 답하기 위해 필요한 맥락의 인덱스 목록"""
 
         ids: List[int | None] = Field(description="Ids of contexts.")
 
-    # LLM은 Pydantic class에 지정된 Field의 형태로만 답변한다.
     structured_llm = llm.with_structured_output(context_list)
-    table_context = ""
+    context = ""
     for idx, table_info in enumerate(table_contexts):
-        table_context += f"{idx}.\n" + table_info + "\n\n"
+        context += f"{table_info}\n\n"
 
     chain = prompt | structured_llm
 
-    output = chain.invoke(
-        {"user_question": user_question, "table_context": table_context}
-    )
+    output = chain.invoke({"user_question": user_question, "context": context})
     return output.ids  # type: ignore
 
 

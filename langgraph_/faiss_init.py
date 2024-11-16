@@ -4,6 +4,7 @@ from typing import List, Dict, Tuple
 from langchain_core.vectorstores import VectorStore
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
+from langchain_community.utilities import SQLDatabase
 
 from sqlalchemy import create_engine, inspect, MetaData
 from dotenv import load_dotenv
@@ -134,18 +135,44 @@ def get_table_ddl(db_name: str | None, DB_SERVER) -> Tuple[List[str], List[str]]
     return table_names, ddl_data
 
 
-def embed_table_ddl(db_names, DB_SERVER):
-    table_ddl_texts = []
-    for db_name in db_names:
-        table_info, ddl_info = get_table_ddl(db_name, DB_SERVER)
-        for table_name, ddl in zip(table_info, ddl_info):
-            text = f"""데이터베이스: {db_name}\n테이블명: {table_name}\n테이블 DDL: {ddl}"""
-            table_ddl_texts.append(text)
+def embed_db_info(db_names, DB_SERVER):
 
-    print("벡터 데이터베이스(테이블 DDL) 생성 중...")
+    # 데이터베이스와 테이블 정보를 저장할 리스트 초기화
+    db_info = []
+
+    # 주어진 모든 데이터베이스 이름에 대해 반복
+    for db_name in db_names:
+
+        # SQLDatabase 객체를 생성하여 데이터베이스에 연결
+        sql_db = SQLDatabase.from_uri(
+            os.path.join(DB_SERVER, db_name), sample_rows_in_table_info=5
+        )
+
+        # 데이터베이스의 테이블 정보를 저장할 리스트 초기화
+        information = []
+
+        # 데이터베이스에서 사용할 수 있는 테이블 이름을 가져와 반복
+        for tables in sql_db.get_usable_table_names():
+
+            # 테이블의 스키마 정보를 가져옴
+            table_schema = sql_db.get_table_info([tables])
+
+            # 데이터베이스 이름과 테이블 정보를 가공하여 문자열로 저장
+            processed_schema = f"데이터베이스:{db_name}\n테이블 정보:{table_schema}"
+
+            # 가공된 정보를 information 리스트에 추가
+            information.append(processed_schema)
+
+        # information에 포함된 모든 테이블 정보를 db_info에 추가
+        db_info.extend(information)
+
+    # OpenAI 임베딩을 사용하여 텍스트 정보를 벡터로 변환
     embeddings = OpenAIEmbeddings()
-    vector_store = FAISS.from_texts(table_ddl_texts, embeddings)
-    print("벡터 데이터베이스(테이블 DDL) 생성 완료!\n")
+
+    # FAISS 벡터 스토어를 사용하여 텍스트 임베딩을 벡터로 변환하여 저장
+    vector_store = FAISS.from_texts(db_info, embeddings)
+
+    # 생성된 벡터 스토어 반환
     return vector_store
 
 
@@ -159,8 +186,9 @@ def get_vector_stores() -> Dict[str, VectorStore]:
     vector_store_dict = {}
     # 접근 가능한 DB 이름 얻기
     db_names = get_db_names(engine)
-    vector_store_dict["db_meta_data"] = embed_db_meta_data(db_names)
-    vector_store_dict["table_info"] = embed_table_info(db_names, engine)
+    vector_store_dict["db_info"] = embed_db_info(db_names, DB_SERVER)
+    # vector_store_dict["db_meta_data"] = embed_db_meta_data(db_names)
+    # vector_store_dict["table_info"] = embed_table_info(db_names, engine)
     # 오래 걸리기에 Redis가 완성되면 ddl 데이터를 임베딩 하는 것으로 한다.
     # vector_store_dict['table_ddl'] = embed_table_ddl(db_names, DB_SERVER)
 
