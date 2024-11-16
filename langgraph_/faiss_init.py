@@ -136,7 +136,6 @@ def get_table_ddl(db_name: str | None, DB_SERVER) -> Tuple[List[str], List[str]]
 
 
 def embed_db_info(db_names, DB_SERVER):
-
     # 데이터베이스와 테이블 정보를 저장할 리스트 초기화
     db_info = []
 
