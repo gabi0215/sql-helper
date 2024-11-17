@@ -165,11 +165,15 @@ def embed_db_info(db_names, DB_SERVER):
         # information에 포함된 모든 테이블 정보를 db_info에 추가
         db_info.extend(information)
 
+    print(f"총 {len(db_info)}개의 데이터 확보")
+
+    print("벡터 데이터베이스 생성 중...")
     # OpenAI 임베딩을 사용하여 텍스트 정보를 벡터로 변환
     embeddings = OpenAIEmbeddings()
 
     # FAISS 벡터 스토어를 사용하여 텍스트 임베딩을 벡터로 변환하여 저장
     vector_store = FAISS.from_texts(db_info, embeddings)
+    print("벡터 데이터베이스 생성 완료!\n")
 
     # 생성된 벡터 스토어 반환
     return vector_store
