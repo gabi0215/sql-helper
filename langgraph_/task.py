@@ -71,20 +71,11 @@ def simple_conversation(user_question: str) -> str:
     return output
 
 
-def refine_user_question(user_question: str) -> str:
-    """사용자의 질문을 분석하고 구체화하는 함수입니다.
-
-    Args:
-        user_question (str): 사용자의 질문
-
-    Returns:
-        str: 구체화된 사용자 질문
-    """
-
+def analyze_user_question(user_question: str) -> str:
     output_parser = StrOutputParser()
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
-    ANALYZEPROMPT = ChatPromptTemplate.from_messages(
+    ANALYZE_PROMPT = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
@@ -110,10 +101,16 @@ def refine_user_question(user_question: str) -> str:
         ]
     )
 
-    analyze_chain = ANALYZEPROMPT | llm | output_parser
+    analyze_chain = ANALYZE_PROMPT | llm | output_parser
     analyze_question = analyze_chain.invoke({"user_question": user_question})
 
-    REFINEPROMPT = ChatPromptTemplate.from_messages(
+    return analyze_question
+
+
+def refine_user_question(user_question: str, user_question_analyze: str) -> str:
+    output_parser = StrOutputParser()
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    REFINE_PROMPT = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
@@ -134,9 +131,9 @@ def refine_user_question(user_question: str) -> str:
         ]
     )
 
-    refine_chain = REFINEPROMPT | llm | output_parser
+    refine_chain = REFINE_PROMPT | llm | output_parser
     refine_question = refine_chain.invoke(
-        {"user_question": user_question, "question_analyze": analyze_question}
+        {"user_question": user_question, "question_analyze": user_question_analyze}
     )
 
     return refine_question
