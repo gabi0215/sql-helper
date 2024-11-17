@@ -8,6 +8,7 @@ from .task import (
     select_relevant_tables,
     extract_context,
     create_query,
+    analyze_user_question,
     refine_user_question,
 )
 
@@ -21,6 +22,7 @@ class GraphState(TypedDict):
     # 그래프 내에서 사용될 모든 key값을 정의해야 오류가 나지 않는다.
     user_question: str  # 사용자의 질문
     user_question_eval: str  # 사용자의 질문이 SQL 관련 질문인지 여부
+    user_question_analyze: str  # 사용자 질문 분석
     final_answer: str
     # TODO
     # context_cnt가 동적으로 조절 되도록 알고리즘을 짜야 한다.
@@ -65,8 +67,23 @@ def non_sql_conversation(state: GraphState) -> GraphState:
     return GraphState(final_answer=final_answer)  # type: ignore
 
 
+def question_analyze(state: GraphState) -> GraphState:
+    """질문 분석을 진행하는 노드
+
+    Args:
+        state (GraphState): LangGraph에서 쓰이는 그래프 상태
+
+    Returns:
+        GraphState: 사용자의 질문을 분석한 대답이 추가된 그래프 상태
+    """
+    user_question = state["user_question"]
+    analyze_question = analyze_user_question(user_question)
+
+    return GraphState(user_question_analyze=analyze_question)
+
+
 def question_refine(state: GraphState) -> GraphState:
-    """질문 세분화와 구체화를 진행하는 노드
+    """질문 구체화를 진행하는 노드
 
     Args:
         state (GraphState): LangGraph에서 쓰이는 그래프 상태
@@ -74,10 +91,11 @@ def question_refine(state: GraphState) -> GraphState:
     Returns:
         GraphState: 사용자의 질문에 대한 대답이 추가된 그래프 상태
     """
+    user_question_analyze = state["user_question_analyze"]
     user_question = state["user_question"]
-    user_question = refine_user_question(user_question)
+    refine_question = refine_user_question(user_question, user_question_analyze)
 
-    return GraphState(user_question=user_question)
+    return GraphState(user_question=refine_question)
 
 
 def table_selection(state: GraphState) -> GraphState:
