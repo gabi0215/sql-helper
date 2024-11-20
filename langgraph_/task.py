@@ -191,7 +191,7 @@ def clarify_user_question(user_question: str, user_question_analyze: str) -> str
 
         if clarify_question.startswith("종료"):
             final_analysis = clarify_question.split("최종분석:")[1].strip()
-            print("\n" + final_analysis)
+            print(f"\n{final_analysis}")
             break
 
         print(f"\n{clarify_question}", flush=True)
@@ -225,7 +225,7 @@ def refine_user_question(user_question: str, user_question_analyze: str) -> str:
                 사용자 질문 분석: 
                 {user_question_analyze}
                 
-                구체화된 질문: """,
+                구체화된 질문:""",
             ),
         ]
     )

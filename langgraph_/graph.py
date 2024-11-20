@@ -8,6 +8,7 @@ from .node import (
     table_selection,
     non_sql_conversation,
     user_question_checker,
+    user_question_analyze_checker,
     query_creation,
     question_analyze,
     question_refine,
@@ -71,4 +72,5 @@ def make_graph() -> CompiledStateGraph:
 
     # Compile the graph
     app = workflow.compile(checkpointer=memory)
+
     return app
