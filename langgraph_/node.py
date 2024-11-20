@@ -10,6 +10,7 @@ from .task import (
     create_query,
     analyze_user_question,
     refine_user_question,
+    clarify_user_question,
 )
 
 # FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다.
@@ -29,6 +30,7 @@ class GraphState(TypedDict):
     context_cnt: int  # 사용자의 질문에 대답하기 위해서 정보를 가져올 context 갯수
     table_contexts: List[str]
     table_contexts_ids: List[int]
+    need_clarification: bool  # 사용자 추가 질문(설명)이 필요한지 여부
     # TODO
     # 지금은 FAISS 벡터 DB를 쓰기에 아래와 같이 딕셔너리에 넣어놓지만, Redis DB 서버를 만들어서 이용할 경우에는 index가 들어가야 한다.
     # FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다. 노드 안에서 객체를 불러오는 것으로 한다.
@@ -80,6 +82,22 @@ def question_analyze(state: GraphState) -> GraphState:
     analyze_question = analyze_user_question(user_question)
 
     return GraphState(user_question_analyze=analyze_question)
+
+
+def question_clarify(state: GraphState) -> GraphState:
+    """사용자 질문이 모호할 경우 추가 질문을 통해 질문 분석을 진행하는 노드
+
+    Args:
+        state (GraphState): LangGraph에서 쓰이는 그래프 상태
+
+    Returns:
+        GraphState: 사용자의 질문을 분석한 대답이 추가된 그래프 상태
+    """
+    user_question_analyze = state["user_question_analyze"]
+    user_question = state["user_question"]
+    clarify_question = clarify_user_question(user_question, user_question_analyze)
+
+    return GraphState(user_question_analyze=clarify_question)
 
 
 def question_refine(state: GraphState) -> GraphState:
@@ -161,3 +179,17 @@ def user_question_checker(state: GraphState) -> str:
         str: 사용자의 질문 분류 결과 ("1" or "0")
     """
     return state["user_question_eval"]
+
+
+def user_question_analyze_checker(state: GraphState) -> bool:
+    user_question_analyze = state["user_question_analyze"]
+    analyze_question = analyze_user_question(user_question_analyze)
+
+    keywords = ["[불명확]", "[확인필요]", "[에러]"]
+
+    if any(keyword in analyze_question for keyword in keywords):
+        state["need_clarification"] = True
+    else:
+        state["need_clarification"] = False
+
+    return state["need_clarification"]
