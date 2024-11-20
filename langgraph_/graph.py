@@ -8,9 +8,11 @@ from .node import (
     table_selection,
     non_sql_conversation,
     user_question_checker,
+    user_question_analyze_checker,
     query_creation,
     question_analyze,
     question_refine,
+    question_clarify,
 )
 
 
@@ -20,6 +22,7 @@ def make_graph() -> CompiledStateGraph:
     workflow.add_node("질문 평가", question_evaluation)
     workflow.add_node("일반적인 대화", non_sql_conversation)
     workflow.add_node("질문 분석", question_analyze)
+    workflow.add_node("추가 질문", question_clarify)
     workflow.add_node("질문 구체화", question_refine)
     workflow.add_node("Table 선택", table_selection)
     workflow.add_node("SQL 쿼리문 생성", query_creation)
@@ -33,7 +36,16 @@ def make_graph() -> CompiledStateGraph:
         },
     )
 
-    workflow.add_edge("질문 분석", "질문 구체화")
+    workflow.add_conditional_edges(
+        "질문 분석",
+        user_question_analyze_checker,
+        {
+            True: "추가 질문",
+            False: "질문 구체화",
+        },
+    )
+
+    workflow.add_edge("추가 질문", "질문 구체화")
     workflow.add_edge("질문 구체화", "Table 선택")
     workflow.add_edge("Table 선택", "SQL 쿼리문 생성")
 
@@ -45,4 +57,5 @@ def make_graph() -> CompiledStateGraph:
 
     # 그래프를 컴파일합니다.
     app = workflow.compile(checkpointer=memory)
+
     return app
