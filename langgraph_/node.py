@@ -1,7 +1,4 @@
-from langchain_core.vectorstores import VectorStore
-from langchain_community.vectorstores import FAISS
-
-from typing import TypedDict, List, Dict
+from typing import TypedDict, List, Any
 from .task import (
     evaluate_user_question,
     simple_conversation,
@@ -10,6 +7,9 @@ from .task import (
     create_query,
     analyze_user_question,
     refine_user_question,
+    clarify_user_question,
+    get_query_result,
+    business_conversation,
 )
 
 # FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다.
@@ -29,6 +29,13 @@ class GraphState(TypedDict):
     context_cnt: int  # 사용자의 질문에 대답하기 위해서 정보를 가져올 context 갯수
     table_contexts: List[str]
     table_contexts_ids: List[int]
+    need_clarification: bool  # 사용자 추가 질문(설명)이 필요한지 여부
+    sql_query: str
+    is_valid: bool
+    max_query_fix: int
+    query_fix_cnt: int
+    query_result: List[Any]
+    error_msg: str
     # TODO
     # 지금은 FAISS 벡터 DB를 쓰기에 아래와 같이 딕셔너리에 넣어놓지만, Redis DB 서버를 만들어서 이용할 경우에는 index가 들어가야 한다.
     # FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다. 노드 안에서 객체를 불러오는 것으로 한다.
@@ -82,6 +89,22 @@ def question_analyze(state: GraphState) -> GraphState:
     return GraphState(user_question_analyze=analyze_question)
 
 
+def question_clarify(state: GraphState) -> GraphState:
+    """사용자 질문이 모호할 경우 추가 질문을 통해 질문 분석을 진행하는 노드
+
+    Args:
+        state (GraphState): LangGraph에서 쓰이는 그래프 상태
+
+    Returns:
+        GraphState: 사용자의 질문을 분석한 대답이 추가된 그래프 상태
+    """
+    user_question_analyze = state["user_question_analyze"]
+    user_question = state["user_question"]
+    clarify_question = clarify_user_question(user_question, user_question_analyze)
+
+    return GraphState(user_question_analyze=clarify_question)
+
+
 def question_refine(state: GraphState) -> GraphState:
     """질문 구체화를 진행하는 노드
 
@@ -109,7 +132,7 @@ def table_selection(state: GraphState) -> GraphState:
     """
     user_qusetion = state["user_question"]
     context_cnt = state["context_cnt"]
-    vector_store = get_vector_stores()["db_info"]  # table_ddl
+    vector_store = get_vector_stores()["db_info"]  # table_ddl + 실제 데이터
     # vector_store = get_vector_stores()["table_info"]  # table_ddl
     # FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다.
     # vector_store = state["vector_store_dict"]["table_info"] # table_ddl
@@ -128,26 +151,54 @@ def table_selection(state: GraphState) -> GraphState:
 
 
 def query_creation(state: GraphState) -> GraphState:
-    """사용자 질문을 포함한 여러 정보들을 가지고 SQL 쿼리문을 생성하는 노드
-
-    Args:
-        state (GraphState): LangGraph에서 쓰이는 그래프 상태
-
-    Returns:
-        GraphState: 사용자의 질문에 대한 SQL 쿼리문이 추가된 그래프 상태
-    """
     user_qusetion = state["user_question"]
     table_contexts = state["table_contexts"]
     table_contexts_ids = state["table_contexts_ids"]
 
-    sql_result = create_query(user_qusetion, table_contexts, table_contexts_ids)
+    query_fix_cnt = state.get("query_fix_cnt", 0)
+    is_valid = state.get("is_valid", True)
 
-    # TODO
-    # 현재 SQL 쿼리문만을 출력하는 것이 중간 목표이기에 final_answer 필드에 저장했지만,
-    # 향후에는 SQL 쿼리문을 저장하는 필드에 저장한 뒤, flow를 이어나가야 한다.
+    if is_valid:
+        sql_query = create_query(user_qusetion, table_contexts, table_contexts_ids)
+
+    else:
+        prev_query = state["sql_query"]
+        error_msg = state["error_msg"]
+        sql_query = create_query(
+            user_qusetion,
+            table_contexts,
+            table_contexts_ids,
+            is_valid=is_valid,
+            prev_query=prev_query,
+            error_msg=error_msg,
+        )
+
     return GraphState(
-        final_answer=sql_result,
+        sql_query=sql_query,
+        query_fix_cnt=query_fix_cnt + 1,
+        is_valid=is_valid,
     )  # type: ignore
+
+
+def query_validation(state: GraphState) -> GraphState:
+    sql_query = state["sql_query"]
+    try:
+        query_result = get_query_result(command=sql_query, fetch="all")
+        return GraphState(query_result=query_result)  # type: ignore
+
+    except Exception as e:
+        return GraphState(is_valid=False, error_msg=e)  # type: ignore
+
+
+def sql_conversation(state: GraphState) -> GraphState:
+    user_question = state["user_question"]
+    sql_query = state["sql_query"]
+    query_result = state["query_result"]
+    final_answer = business_conversation(
+        user_question, sql_query=sql_query, query_result=query_result
+    )
+
+    return GraphState(final_answer=final_answer)  # type: ignore
 
 
 ################### ROUTERS ###################
@@ -161,3 +212,29 @@ def user_question_checker(state: GraphState) -> str:
         str: 사용자의 질문 분류 결과 ("1" or "0")
     """
     return state["user_question_eval"]
+
+
+def user_question_analyze_checker(state: GraphState) -> str:
+    user_question_analyze = state["user_question_analyze"]
+    analyze_question = analyze_user_question(user_question_analyze)
+
+    keywords = ["[불명확]", "[확인필요]", "[에러]"]
+
+    if any(keyword in analyze_question for keyword in keywords):
+        state["need_clarification"] = True
+    else:
+        state["need_clarification"] = False
+
+    return state["need_clarification"]
+
+
+def query_checker(state: GraphState) -> str:
+    is_valid = state["is_valid"]
+    max_query_fix = state["max_query_fix"]
+    query_fix_cnt = state["query_fix_cnt"]
+
+    # 정해진 최대 재생성 횟수를 넘어서면 pass
+    if is_valid or query_fix_cnt >= max_query_fix:
+        return "KEEP"
+    else:
+        return "REGENERATE"
