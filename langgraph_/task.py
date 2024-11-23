@@ -146,7 +146,7 @@ def clarify_user_question(user_question: str, user_question_analyze: str) -> str
                 
                 종료 조건:
                 1. [불명확], [확인필요], [에러] 태그에 해당하는 모든 문제가 해결된 경우
-                2. 사용자가 더 이상의 추가 정보 제공을 원하지 않는 경우
+                2. "해당 사항 없음"과 같은 사용자가 더 이상의 추가 정보 제공을 원하지 않는 경우
                 3. 이전 질문 기록에 중복된 질문이 반복될 경우
 
                 응답 형식:
@@ -195,11 +195,10 @@ def clarify_user_question(user_question: str, user_question_analyze: str) -> str
             break
 
         print(f"\n{clarify_question}", flush=True)
-        user_answer = input("답변을 입력하세요 (종료하려면 'q' 또는 '종료'): ").strip()
+        user_answer = input(
+            "답변을 입력하세요 (종료하려면 '해당 사항 없음' 입력): "
+        ).strip()
         print(f"사용자 답변: {user_answer}")
-
-        if user_answer.lower() in ["q", "종료"]:
-            break
 
         user_add_questions.append(
             f"\n질문: \n{clarify_question}\n답변: {user_answer}\n"
