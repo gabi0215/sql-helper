@@ -135,7 +135,7 @@ def get_table_ddl(db_name: str | None, DB_SERVER) -> Tuple[List[str], List[str]]
     return table_names, ddl_data
 
 
-def embed_db_info(db_names, DB_SERVER):
+def embed_db_info(db_names: str | None, DB_SERVER: str, sample_info: int):
     # 데이터베이스와 테이블 정보를 저장할 리스트 초기화
     db_info = []
 
@@ -144,7 +144,7 @@ def embed_db_info(db_names, DB_SERVER):
 
         # SQLDatabase 객체를 생성하여 데이터베이스에 연결
         sql_db = SQLDatabase.from_uri(
-            os.path.join(DB_SERVER, db_name), sample_rows_in_table_info=5
+            os.path.join(DB_SERVER, db_name), sample_rows_in_table_info=sample_info
         )
 
         # 데이터베이스의 테이블 정보를 저장할 리스트 초기화
@@ -179,7 +179,7 @@ def embed_db_info(db_names, DB_SERVER):
     return vector_store
 
 
-def get_vector_stores() -> Dict[str, VectorStore]:
+def get_vector_stores(sample_info: int) -> Dict[str, VectorStore]:
     load_dotenv()
     DB_SERVER = os.getenv("URL")
     information_schema_path = os.path.join(DB_SERVER, "INFORMATION_SCHEMA")  # type: ignore
@@ -189,7 +189,7 @@ def get_vector_stores() -> Dict[str, VectorStore]:
     vector_store_dict = {}
     # 접근 가능한 DB 이름 얻기
     db_names = get_db_names(engine)
-    vector_store_dict["db_info"] = embed_db_info(db_names, DB_SERVER)
+    vector_store_dict["db_info"] = embed_db_info(db_names, DB_SERVER, sample_info)
     # vector_store_dict["db_meta_data"] = embed_db_meta_data(db_names)
     # vector_store_dict["table_info"] = embed_table_info(db_names, engine)
     # 오래 걸리기에 Redis가 완성되면 ddl 데이터를 임베딩 하는 것으로 한다.

@@ -30,6 +30,7 @@ class GraphState(TypedDict):
     table_contexts: List[str]
     table_contexts_ids: List[int]
     need_clarification: bool  # 사용자 추가 질문(설명)이 필요한지 여부
+    sample_info: int
     sql_query: str
     is_valid: bool
     max_query_fix: int
@@ -132,7 +133,8 @@ def table_selection(state: GraphState) -> GraphState:
     """
     user_qusetion = state["user_question"]
     context_cnt = state["context_cnt"]
-    vector_store = get_vector_stores()["db_info"]  # table_ddl + 실제 데이터
+    sample_info = state["sample_info"]
+    vector_store = get_vector_stores(sample_info)["db_info"]  # table_ddl + 실제 데이터
     # vector_store = get_vector_stores()["table_info"]  # table_ddl
     # FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다.
     # vector_store = state["vector_store_dict"]["table_info"] # table_ddl
