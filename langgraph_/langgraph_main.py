@@ -28,6 +28,18 @@ def get_config():
         type=str,
     )
 
+    parser.add_argument(
+        "--max-query-fix",
+        default=2,
+        type=int,
+    )
+
+    parser.add_argument(
+        "--sample-info",
+        default=5,
+        type=int,
+    )
+
     config = parser.parse_args()
 
     return config
@@ -61,7 +73,7 @@ if __name__ == "__main__":
     graph = make_graph()
 
     # 입력을 위해 그래프 상태 만들기
-    inputs = GraphState(user_question=config.user_question, context_cnt=config.context_cnt)  # type: ignore
+    inputs = GraphState(user_question=config.user_question, context_cnt=config.context_cnt, max_query_fix=config.max_query_fix, sample_info=config.sample_info)  # type: ignore
     outputs = graph.invoke(input=inputs, config=runnable_config)
 
     print(outputs["final_answer"])

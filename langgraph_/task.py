@@ -2,9 +2,15 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.vectorstores import VectorStore
+from langchain_core.messages import SystemMessage
 
-from typing import List
+from sqlalchemy import create_engine, text
+from sqlalchemy.sql.expression import Executable
+from sqlalchemy.engine import Result
+
+from typing import List, Any, Union, Sequence, Dict
 from pydantic import BaseModel, Field
+import os, re
 
 
 def evaluate_user_question(user_question: str) -> str:
@@ -71,6 +77,166 @@ def simple_conversation(user_question: str) -> str:
     return output
 
 
+def analyze_user_question(user_question: str) -> str:
+    output_parser = StrOutputParser()
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+    ANALYZE_PROMPT = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """당신은 사용자의 질문을 분석하여 데이터베이스 쿼리에 필요한 요소들을 파악하는 전문가입니다.
+                    다음과 같은 요소들을 체계적으로 분석해주세요:
+                    - 질문의 핵심 의도
+                    - 필요한 데이터 항목
+                    - 시간적 범위
+                    - 데이터 필터링 조건
+                    - 데이터 정렬 및 그룹화 요구사항
+                    
+                    분석 과정에서 발견된 문제점을 다음 태그를 사용하여 설명해주세요:
+                    - [불명확] - 질문이 모호하거나 여러 해석이 가능한 경우
+                    예시: "최근", "적절한" 같이 기준이 불분명한 표현
+                    - [확인필요] - 추가 정보나 맥락이 필요한 경우
+                    예시: 특정 용어의 정의나 기준이 명시되지 않은 경우
+                    - [에러] - 논리적 모순이 발생한 경우""",
+            ),
+            (
+                "human",
+                """사용자 질문: {user_question}
+                    
+                    아래 형식으로 상세하게 분석해주세요:
+                    - 주요 의도: 사용자가 질문의 핵심적으로 묻고자 하는 바는 무엇인가요?
+                    - 필요한 데이터 항목: 사용자가 원하는 구체적인 데이터나 정보는 무엇인가요?
+                    - 시간적 범위: 사용자가 원하는 시간적 범위는 어떻게 되나요?
+                    - 데이터 필터링 조건: 사용자가 요청한 데이터에는 어떤 조건이나 필터링이 필요한가요?
+                    - 데이터 정렬 및 그룹화: 사용자가 원하는 데이터의 정렬 기준이나 그룹화 방식은 무엇인가요?
+                    
+                    분석 과정에서 발견한 문제점을 아래에 태그와 함께 설명해주세요:
+                    - [불명확]:
+                    - [확인필요]:
+                    - [에러]:""",
+            ),
+        ]
+    )
+
+    analyze_chain = ANALYZE_PROMPT | llm | output_parser
+    analyze_question = analyze_chain.invoke({"user_question": user_question})
+
+    return analyze_question
+
+
+def clarify_user_question(user_question: str, user_question_analyze: str) -> str:
+    output_parser = StrOutputParser()
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+    user_add_questions = []
+    final_analysis = user_question_analyze
+    CLARIFY_PROMPT = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """당신은 데이터 분석가로서 [불명확], [확인필요], [에러] 태그 뒤에 명시된 문제를 파악하고 해결하기 위한 적절한 추가 질문을 합니다. 이를 통해 문제가 해결됬는지 판단하세요. 
+                
+                추가 질문 조건:
+                1. 태그([불명확], [확인필요], [에러])로 표시된 문제만 질문하고 이외 추가적인 질문은 절대 금지
+                2. 한 번에 하나의 질문만 제시
+                3. 객관식 질문으로 구성
+                4. 구체적이고 이해하기 쉬운 질문으로 작성
+                5. 이전 질문 기록을 검토하여 중복 질문 방지
+                
+                종료 조건:
+                1. [불명확], [확인필요], [에러] 태그에 해당하는 모든 문제가 해결된 경우
+                2. "해당 사항 없음"과 같은 사용자가 더 이상의 추가 정보 제공을 원하지 않는 경우
+                3. 이전 질문 기록에 중복된 질문이 반복될 경우
+
+                응답 형식:
+                1. 추가 질문이 필요한 경우:
+                "질문:\n1) 옵션 1\n2) 옵션 2\n3) 옵션 3\n4) 직접 입력\n"
+                
+                2. 종료 조건을 만족한 경우:
+                "종료\n최종분석:\n주요 의도:\n필요한 데이터 항목:\n시간적 범위:\n데이터 필터링 조건:\n데이터 정령 및 그룹화 요구사항:"
+                """,
+            ),
+            (
+                "human",
+                """원래 사용자 질문:
+                {user_question}
+                
+                초기 질문 분석:
+                {user_question_analyze}
+                
+                이전 질문 기록:
+                {collected_questions}
+                
+                지시사항:
+                태그([불명확], [확인필요], [에러])가 표시된 모든 문제가 해결되면 분석을 종료하세요.
+                """,
+            ),
+        ]
+    )
+
+    while True:
+        clarify_chain = CLARIFY_PROMPT | llm | output_parser
+        collected_questions = "\n".join(
+            f"{i+1}. {q}" for i, q in enumerate(user_add_questions)
+        )
+
+        clarify_question = clarify_chain.invoke(
+            {
+                "user_question": user_question,
+                "user_question_analyze": user_question_analyze,
+                "collected_questions": collected_questions,
+            }
+        )
+
+        if clarify_question.startswith("종료"):
+            final_analysis = clarify_question.split("최종분석:")[1].strip()
+            print(f"\n{final_analysis}")
+            break
+
+        print(f"\n{clarify_question}", flush=True)
+        user_answer = input(
+            "답변을 입력하세요 (종료하려면 '해당 사항 없음' 입력): "
+        ).strip()
+        print(f"사용자 답변: {user_answer}")
+
+        user_add_questions.append(
+            f"\n질문: \n{clarify_question}\n답변: {user_answer}\n"
+        )
+
+    return final_analysis
+
+
+def refine_user_question(user_question: str, user_question_analyze: str) -> str:
+    output_parser = StrOutputParser()
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    REFINE_PROMPT = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """당신은 사용자의 질문을 더 명확하고 구체적으로 다듬는 전문가입니다. 주어진 질문과 분석을 바탕으로 더 구체적인 질문으로 재구성하세요.""",
+            ),
+            (
+                "human",
+                """사용자 질문: 
+                {user_question}
+                
+                사용자 질문 분석: 
+                {user_question_analyze}
+                
+                구체화된 질문:""",
+            ),
+        ]
+    )
+
+    refine_chain = REFINE_PROMPT | llm | output_parser
+    refine_question = refine_chain.invoke(
+        {"user_question": user_question, "user_question_analyze": user_question_analyze}
+    )
+
+    return refine_question
+
+
 def select_relevant_tables(
     user_question: str, context_cnt: int, vector_store: VectorStore
 ) -> List[str]:
@@ -111,77 +277,245 @@ def extract_context(user_question: str, table_contexts: List[str]) -> List[int]:
         [
             (
                 "system",
-                "당신은 사용자의 입력을 SQL문으로 바꾸어주는 조직의 팀원입니다. 당신에게는 사용자의 입력(user_question)과 검색을 통해 가져온 context에 번호가 매겨진 채로 주어질 것 입니다. 당신의 임무는 사용자의 입력을 기반으로 SQL을 생성할 때, 필요한 context의 번호를 추출하여 리스트의 형태로 반환하는 것 입니다. 만약 모든 context가 필요 없다면, 빈 리스트를 반환해도 됩니다.",
+                """당신은 사용자의 질문을 SQL로 변환하는 데 필요한 정보를 식별하는 전문가입니다.
+                
+                당신의 임무:
+                1. 주어진 사용자 질문을 분석하여 SQL 생성에 필요한 정보들을 식별
+                2. 필요한 정보의 인덱스를 정수 리스트로 반환
+
+                입력 형식:
+                - 사용자 질문: SQL로 변환이 필요한 사용자의 질문
+                - context: 사용자 질문을 SQL문으로 변환할 때 사용할 정보들
+
+                반환 형식:
+                - 필요한 context의 인덱스를 담은 정수 리스트
+                - 필요한 context가 없는 경우 빈 리스트
+
+                주의사항:
+                - 인덱스는 제시된 순서대로 정렬하여 반환합니다
+                - SQL 생성에 확실히 필요한 정보만 선택합니다""",
             ),
             (
                 "human",
-                "user_question:\n{user_question}\n\ncontext:\n{table_context}",
+                """user_question:
+                {user_question}
+                
+                context:
+                {context}""",
             ),
         ]
     )
+
     llm = ChatOpenAI(model="gpt-4o-mini")
 
-    # LLM의 Structured Output을 위한 Pydantic class
     class context_list(BaseModel):
-        """Index list of the context which is necessary for answering user_question."""
+        """사용자 질문에 답하기 위해 필요한 맥락의 인덱스 목록"""
 
         ids: List[int | None] = Field(description="Ids of contexts.")
 
-    # LLM은 Pydantic class에 지정된 Field의 형태로만 답변한다.
     structured_llm = llm.with_structured_output(context_list)
-    table_context = ""
+    context = ""
     for idx, table_info in enumerate(table_contexts):
-        table_context += f"{idx}.\n" + table_info + "\n\n"
+        context += f"{idx}.\n{table_info}\n\n"
 
     chain = prompt | structured_llm
 
-    output = chain.invoke(
-        {"user_question": user_question, "table_context": table_context}
-    )
+    output = chain.invoke({"user_question": user_question, "context": context})
     return output.ids  # type: ignore
 
 
 def create_query(
-    user_question: str, table_contexts: List[str], table_contexts_ids: List[int]
-) -> str:
-    """사용자의 질문(user_question)을 query로, 테이블의 메타데이터(table_contexts)를 context로 하여 답변을 생성하는 함수입니다.
-    필요한 context의 index를 담은 table_contexts_ids를 이용해 필요한 context만 뽑아서 프롬프트에 넣습니다.
-
-    Args:
-        user_question (str): 사용자의 질문
-        table_contexts (List[str]): context들을 담은 리스트
-        table_contexts_ids (List[int]): 필요한 context의 index를 담은 리스트
-
-    Returns:
-        str: 모델이 생성한 SQL문
-    """
-
+    user_question,
+    table_contexts,
+    table_contexts_ids,
+    is_valid=True,
+    prev_query="",
+    error_msg="",
+):
     output_parser = StrOutputParser()
-    # TODO
-    # 동일한 함수에서 저장된 prompt의 경로만 교체해서 효율성을 높이는 것을 고려해보아야 한다
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                "당신은 사용자의 입력을 SQL문으로 바꾸어주는 조직의 팀원입니다. 당신의 임무는 주어진 질문(user_question)과 DB 이름 그리고 DB내 테이블의 메타 정보가 담긴(context)를 이용해서 주어진 질문에 걸맞는 SQL 쿼리문을 작성하는 것입니다. SQL 쿼리문 작성시 모든 테이블의 DB를 db.table 처럼 표시해주세요",
-            ),
-            (
-                "human",
-                """user_question: {user_question}
-                context: {context}""",
-            ),
-        ]
-    )
-
     context = ""
     for idx, table_info in enumerate(table_contexts):
         if idx in set(table_contexts_ids):
             context += table_info + "\n\n"
 
+    GENERAL_QUERY_PREFIX = """당신은 사용자의 입력을 MySQL 쿼리문으로 바꾸어주는 조직의 팀원입니다. 당신의 임무는 DB 이름 그리고 DB내 테이블의 메타 정보가 담긴 아래의 (context)를 이용해서 주어진 질문(user_question)에 걸맞는 MySQL 쿼리문을 작성하는 것입니다.
+
+    (context)
+    {context}
+    """
+
+    GENERAL_QUERY_POSTFIX = """
+    쿼리문 작성 시 주의사항:
+
+    모든 테이블의 DB를 db.table 처럼 표시해주세요.
+    """
+
+    GENERATE_QUERY_INSTRUCTIONS = (
+        """
+    주어진 질문(user_question)에 대해서 문법적으로 올바른 MySQL 쿼리문을 작성해 주세요.
+    """
+        + GENERAL_QUERY_POSTFIX
+    )
+
+    FIX_QUERY_INSTRUCTIONS = (
+        """
+    당신은 이전에 사용자에게 쿼리문(prev_query)을 제공했으나, 아래와 같은 에러메시지(error_msg)를 받았습니다.:
+
+    (prev_query)
+    {prev_query}
+
+    (error_msg)
+    {error_msg}
+
+    주어진 질문(user_question)에 대해서 문법적으로 올바른 MySQL 쿼리문을 새로 작성해 주세요.
+    """
+        + GENERAL_QUERY_POSTFIX
+    )
+
+    prompt_prefix = GENERAL_QUERY_PREFIX.format(context=context)
+
+    if is_valid:
+        # TODO
+        # 동일한 함수에서 저장된 prompt의 경로만 교체해서 효율성을 높이는 것을 고려해보아야 한다
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                SystemMessage(content=prompt_prefix + GENERATE_QUERY_INSTRUCTIONS),
+                (
+                    "human",
+                    """user_question: {user_question}""",
+                ),
+            ]
+        )
+    else:
+        fix_prompt = FIX_QUERY_INSTRUCTIONS.format(
+            prev_query=prev_query, error_msg=error_msg
+        )
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                SystemMessage(content=prompt_prefix + fix_prompt),
+                ("human", """user_question: {user_question}"""),
+            ]
+        )
+
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    chain = prompt | llm | output_parser
+
+    output = chain.invoke({"user_question": user_question})
+    try:
+        sql_query = re.search(r"```sql\s*(.*?)\s*```", output, re.DOTALL).group(1)
+    except:
+        sql_query = re.search(r"SELECT.*?;", output, re.DOTALL).group(1)
+
+    return sql_query
+
+
+def execute_query(command: str | Executable, fetch="all") -> Union[Sequence[Dict[str, Any]], Result]:  # type: ignore
+    """
+    Executes SQL command through underlying engine.
+
+    If the statement returns no rows, an empty list is returned.
+    """
+    parameters = {}
+    execution_options = {}
+    db_path = os.path.join(os.getenv("URL"), "INFORMATION_SCHEMA")  # type: ignore
+    engine = create_engine(db_path)
+
+    with engine.begin() as connection:
+        if isinstance(command, str):
+            command = text(command)
+        elif isinstance(command, Executable):
+            pass
+        else:
+            raise TypeError(f"Query expression has unknown type: {type(command)}")
+
+        cursor = connection.execute(
+            command,
+            parameters,
+            execution_options=execution_options,
+        )
+        if cursor.returns_rows:
+            if fetch == "all":
+                result = [x._asdict() for x in cursor.fetchall()]
+            elif fetch == "one":
+                first_result = cursor.fetchone()
+                result = [] if first_result is None else [first_result._asdict()]
+            elif fetch == "cursor":
+                return cursor
+            else:
+                raise ValueError(
+                    "Fetch parameter must be either 'one', 'all', or 'cursor'"
+                )
+            return result
+
+
+def truncate_word(content: Any, *, length: int = 300, suffix: str = "...") -> str:
+    """
+    Truncate a string to a certain number of words, based on the max string
+    length.
+    """
+
+    if not isinstance(content, str) or length <= 0:
+        return content
+
+    if len(content) <= length:
+        return content
+
+    return content[: length - len(suffix)].rsplit(" ", 1)[0] + suffix
+
+
+def get_query_result(command, fetch, include_columns=False):
+    result = execute_query(command, fetch)
+    if fetch == "cursor":
+        return result
+
+    # 너무 긴 데이터는 잘라내기
+    res = [
+        {column: truncate_word(value, length=300) for column, value in r.items()}
+        for r in result
+    ]
+
+    # column 이름을 제거해서 token 수 절약하기
+    # SQL 쿼리문을 같이 입력으로 주면 column 이름이 없어도 된다.
+    if not include_columns:
+        res = [tuple(row.values()) for row in res]  # type: ignore[misc]
+
+    if not res:
+        return ""
+    else:
+        return str(res)
+
+
+def business_conversation(user_question, sql_query, query_result) -> str:
+    output_parser = StrOutputParser()
+
+    BUSINESS_CONV_INSTRUCTION = """당신은 친절한 데이터 분석 전문가 입니다.
+    당신의 임무는 사용자의 질문을 참고하여 만들어진 SQL 쿼리문(sql_query)과 결과(result)를 활용하여 사용자의 질문(user_question)에 대해서 대답하는 것 입니다.
+
+    (sql_query)
+    {sql_query}
+
+    (result)
+    {query_result}
+    """
+
+    instruction = BUSINESS_CONV_INSTRUCTION.format(
+        sql_query=sql_query, query_result=query_result
+    )
+    # TODO
+    # 동일한 함수에서 저장된 prompt의 경로만 교체해서 효율성을 높이는 것을 고려해보아야 한다
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            SystemMessage(content=instruction),
+            (
+                "human",
+                """user_question: {user_question}""",
+            ),
+        ]
+    )
     llm = ChatOpenAI(model="gpt-4o-mini")
     chain = prompt | llm | output_parser
 
-    output = chain.invoke({"user_question": user_question, "context": context})
+    output = chain.invoke({"user_question": user_question})
     return output
 
 
