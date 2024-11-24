@@ -18,10 +18,18 @@ class EmptyQueryResultError(Exception):
     def __str__(self):
         return self.msg
 
+    # SQLAlchemy 에서 에러메시지를 출력하기 위한 메서드
+    def _message(self):
+        return self.msg
+
 
 class NullQueryResultError(Exception):
     def __init__(self):
         self.msg = "SQL query only returns NULL for every column."
 
     def __str__(self):
+        return self.msg
+
+    # SQLAlchemy 에서 에러메시지를 출력하기 위한 메서드
+    def _message(self):
         return self.msg

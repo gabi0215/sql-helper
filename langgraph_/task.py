@@ -259,7 +259,14 @@ def select_relevant_tables(
     return table_contexts
 
 
-def extract_context(user_question: str, table_contexts: List[str]) -> List[int]:
+def extract_context(
+    user_question: str,
+    table_contexts: List[str],
+    flow_status: str = "KEEP",
+    prev_list: List[int] = [],
+    prev_query: str = "",
+    error_msg: str = "",
+) -> List[int]:
     """벡터 스토어에서 검색으로 얻어낸 context들을 대상으로 사용자의 질문(user_question)에 기반한 SQL문을 생성함에 있어 필요한지를 판단한 후,
     필요한 context의 인덱스를 담은 리스트를 반환하는 함수입니다.
 
@@ -274,35 +281,55 @@ def extract_context(user_question: str, table_contexts: List[str]) -> List[int]:
         # 평가할 context가 없다면 빈 리스트 반환
         return []
 
+    EXTRACT_CONTEXT_MAIN = """당신은 사용자의 입력을 SQL문으로 바꾸어주는 조직의 팀원입니다.
+    당신에게는 사용자의 입력(user_question), 그리고 검색을 통해 가져온 context들이 번호가 매겨진 채로 주어질 것 입니다.
+    당신의 임무는 사용자의 입력을 기반으로 SQL을 생성할 때, 필요한 context의 번호를 추출하여 리스트의 형태로 반환하는 것 입니다.
+    만약 모든 context가 필요 없다면, 빈 리스트를 반환해도 됩니다.\n"""
+
+    EXTRACT_CONTEXT_MAIN_v2 = """당신은 사용자의 질문을 SQL로 변환하는 데 필요한 정보를 식별하는 전문가입니다.
+                
+    당신의 임무:
+    1. 주어진 사용자 질문을 분석하여 SQL 생성에 필요한 정보들을 식별
+    2. 필요한 정보의 인덱스를 정수 리스트로 반환
+
+    입력 형식:
+    - 사용자 질문: SQL로 변환이 필요한 사용자의 질문
+    - context: 사용자 질문을 SQL문으로 변환할 때 사용할 정보들
+
+    반환 형식:
+    - 필요한 context의 인덱스를 담은 정수 리스트
+    - 필요한 context가 없는 경우 빈 리스트
+
+    주의사항:
+    - 인덱스는 제시된 순서대로 정렬하여 반환합니다
+    - SQL 생성에 확실히 필요한 정보만 선택합니다"""
+
+    REEXTRACT_CONTEXT_POSTFIX = """\n**참고사항**\n당신이 이전에 반환한 리스트를 참고하여 SQL문을 만들었으나, 오류가 있었습니다.
+    아래에 주어진 이전에 반환한 리스트(prev_list), 생성된 쿼리문(prev_query), 그리고 오류 메시지(error_msg)를 참고하여, 올바른 context의 번호를 추출하여 리스트의 형태로 반환하세요.
+
+    (prev_list)
+    {prev_list}
+
+    (prev_query)
+    {prev_query}
+
+    (error_msg)
+    {error_msg}"""
+
+    instruction = EXTRACT_CONTEXT_MAIN
+
+    if flow_status == "RESELECT":
+        print("검색된 테이블 스키마 재검수")
+        instruction += REEXTRACT_CONTEXT_POSTFIX.format(
+            prev_list=prev_list, prev_query=prev_query, error_msg=error_msg
+        )
+
     prompt = ChatPromptTemplate.from_messages(
         [
-            (
-                "system",
-                """당신은 사용자의 질문을 SQL로 변환하는 데 필요한 정보를 식별하는 전문가입니다.
-                
-                당신의 임무:
-                1. 주어진 사용자 질문을 분석하여 SQL 생성에 필요한 정보들을 식별
-                2. 필요한 정보의 인덱스를 정수 리스트로 반환
-
-                입력 형식:
-                - 사용자 질문: SQL로 변환이 필요한 사용자의 질문
-                - context: 사용자 질문을 SQL문으로 변환할 때 사용할 정보들
-
-                반환 형식:
-                - 필요한 context의 인덱스를 담은 정수 리스트
-                - 필요한 context가 없는 경우 빈 리스트
-
-                주의사항:
-                - 인덱스는 제시된 순서대로 정렬하여 반환합니다
-                - SQL 생성에 확실히 필요한 정보만 선택합니다""",
-            ),
+            SystemMessage(content=instruction),
             (
                 "human",
-                """user_question:
-                {user_question}
-                
-                context:
-                {context}""",
+                "user_question:\n{user_question}\n\ncontext:\n{context}",
             ),
         ]
     )
@@ -310,7 +337,7 @@ def extract_context(user_question: str, table_contexts: List[str]) -> List[int]:
     llm = ChatOpenAI(model="gpt-4o-mini")
 
     class context_list(BaseModel):
-        """사용자 질문에 답하기 위해 필요한 맥락의 인덱스 목록"""
+        """Index list of the context which is necessary for answering user_question."""
 
         ids: List[int | None] = Field(description="Ids of contexts.")
 
@@ -348,7 +375,7 @@ def create_query(
     GENERAL_QUERY_POSTFIX = """
     쿼리문 작성 시 주의사항:
 
-    모든 테이블의 DB를 db.table 처럼 표시해주세요.
+    테이블이 어떤 DB에 속하는지 표시해주세요.
     """
 
     GENERATE_QUERY_INSTRUCTIONS = (

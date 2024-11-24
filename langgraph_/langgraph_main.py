@@ -36,6 +36,12 @@ def get_config():
     )
 
     parser.add_argument(
+        "--query-fix-cnt",
+        default=-1,
+        type=int,
+    )
+
+    parser.add_argument(
         "--sample-info",
         default=5,
         type=int,
@@ -57,7 +63,7 @@ def text2sql(user_input):
     graph = make_graph()
 
     # 입력을 위해 그래프 상태 만들기
-    inputs = GraphState(user_question=user_input, context_cnt=config.context_cnt)  # type: ignore
+    inputs = GraphState(user_question=user_input, context_cnt=config.context_cnt, max_query_fix=config.max_query_fix, query_fix_cnt=config.query_fix_cnt, sample_info=config.sample_info)  # type: ignore
     outputs = graph.invoke(input=inputs, config=runnable_config)
 
     return outputs["final_answer"]
@@ -65,17 +71,7 @@ def text2sql(user_input):
 
 if __name__ == "__main__":
     load_dotenv()
-    # config 설정
+
     config = get_config()
-    runnable_config = get_runnable_config(
-        recursion_limit=config.recursion_limit, thread_id=config.thread_id
-    )
 
-    # graph 생성
-    graph = make_graph()
-
-    # 입력을 위해 그래프 상태 만들기
-    inputs = GraphState(user_question=config.user_question, context_cnt=config.context_cnt, max_query_fix=config.max_query_fix, sample_info=config.sample_info)  # type: ignore
-    outputs = graph.invoke(input=inputs, config=runnable_config)
-
-    print(outputs["final_answer"])
+    print(text2sql(user_input=config.user_question))
