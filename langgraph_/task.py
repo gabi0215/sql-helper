@@ -8,6 +8,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.sql.expression import Executable
 from sqlalchemy.engine import Result
 
+from .utils import EmptyQueryResultError, NullQueryResultError
 from typing import List, Any, Union, Sequence, Dict
 from pydantic import BaseModel, Field
 import os, re
@@ -409,6 +410,20 @@ def create_query(
     return sql_query
 
 
+def check_query_result(result: Sequence[Dict[str, Any]]) -> Exception | None:
+
+    if not result:
+        # 쿼리문 결과가 빈 리스트이면, 에러 발생
+        raise EmptyQueryResultError()
+
+    for row in result:
+        # 쿼리문 결과 row 중 하나라도 NULL이면, 통과
+        if not all(value is None for value in row.values()):
+            return None
+    # 쿼리문 결과 row 중 모두 NULL 인 경우, 에러 발생
+    raise NullQueryResultError()
+
+
 def execute_query(command: str | Executable, fetch="all") -> Union[Sequence[Dict[str, Any]], Result]:  # type: ignore
     """
     Executes SQL command through underlying engine.
@@ -445,6 +460,7 @@ def execute_query(command: str | Executable, fetch="all") -> Union[Sequence[Dict
                 raise ValueError(
                     "Fetch parameter must be either 'one', 'all', or 'cursor'"
                 )
+            check_query_result(result)
             return result
 
 

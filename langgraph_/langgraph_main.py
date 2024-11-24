@@ -1,4 +1,5 @@
 import argparse
+from dotenv import load_dotenv
 
 from .node import GraphState
 from .graph import make_graph
@@ -63,6 +64,7 @@ def text2sql(user_input):
 
 
 if __name__ == "__main__":
+    load_dotenv()
     # config 설정
     config = get_config()
     runnable_config = get_runnable_config(

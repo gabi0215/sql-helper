@@ -157,7 +157,7 @@ def query_creation(state: GraphState) -> GraphState:
     table_contexts = state["table_contexts"]
     table_contexts_ids = state["table_contexts_ids"]
 
-    query_fix_cnt = state.get("query_fix_cnt", 0)
+    query_fix_cnt = state.get("query_fix_cnt", -1)
     is_valid = state.get("is_valid", True)
 
     if is_valid:
@@ -184,12 +184,25 @@ def query_creation(state: GraphState) -> GraphState:
 
 def query_validation(state: GraphState) -> GraphState:
     sql_query = state["sql_query"]
+    query_fix_cnt = state["query_fix_cnt"]
+    max_query_fix = state["max_query_fix"]
     try:
         query_result = get_query_result(command=sql_query, fetch="all")
-        return GraphState(query_result=query_result)  # type: ignore
+        return GraphState(
+            query_result=query_result,
+        )  # type: ignore
 
     except Exception as e:
-        return GraphState(is_valid=False, error_msg=e)  # type: ignore
+        if query_fix_cnt >= max_query_fix:
+            return GraphState(
+                is_valid=False,
+                query_result=e,
+            )  # type: ignore
+        else:
+            return GraphState(
+                is_valid=False,
+                error_msg=e,
+            )  # type: ignore
 
 
 def sql_conversation(state: GraphState) -> GraphState:

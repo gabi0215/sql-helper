@@ -9,3 +9,19 @@ def get_runnable_config(recursion_limit: int, thread_id: str) -> RunnableConfig:
         recursion_limit=recursion_limit, configurable={"thread_id": thread_id}
     )
     return config
+
+
+class EmptyQueryResultError(Exception):
+    def __init__(self):
+        self.msg = "No rows returned by the SQL query."
+
+    def __str__(self):
+        return self.msg
+
+
+class NullQueryResultError(Exception):
+    def __init__(self):
+        self.msg = "SQL query only returns NULL for every column."
+
+    def __str__(self):
+        return self.msg
