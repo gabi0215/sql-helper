@@ -33,3 +33,18 @@ class NullQueryResultError(Exception):
     # SQLAlchemy 에서 에러메시지를 출력하기 위한 메서드
     def _message(self):
         return self.msg
+
+
+def load_prompt(prompt_path: str) -> str:
+    """
+    입력된 경로에 존재하는 프롬프트 파일을 로드합니다.
+
+    Args:
+        prompt_path (str): 프롬프트 파일의 경로.
+
+    Returns:
+        str: 로드된 프롬프트 내용.
+    """
+    with open(f"./{prompt_path}", "r", encoding="utf-8") as f:
+        prompt = f.read()
+    return prompt

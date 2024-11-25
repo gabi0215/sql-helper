@@ -2,13 +2,13 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.vectorstores import VectorStore
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.sql.expression import Executable
 from sqlalchemy.engine import Result
 
-from .utils import EmptyQueryResultError, NullQueryResultError
+from .utils import EmptyQueryResultError, NullQueryResultError, load_prompt
 from typing import List, Any, Union, Sequence, Dict
 from pydantic import BaseModel, Field
 import os, re
@@ -28,13 +28,12 @@ def evaluate_user_question(user_question: str) -> str:
     output_parser = StrOutputParser()
     prompt = ChatPromptTemplate.from_messages(
         [
-            (
-                "system",
-                "당신은 사용자의 입력을 SQL문으로 바꾸어주는 조직의 팀원입니다. 당신의 임무는 주어진 질문(user_question)이 데이터 또는 비즈니스와 관련된 일인지를 판단하는 것 입니다.",
+            SystemMessage(
+                content=load_prompt("prompts/question_evaluation/main_v1.prompt")
             ),
             (
                 "human",
-                "주어진 질문(user_question)이 데이터 또는 비즈니스와 관련되어 있으면 1, 아니면 0을 출력하세요. `1`과 같이 결과만 작성하세요.\n\n#질문(user_question): {user_question}",
+                "질문(user_question): {user_question}",
             ),
         ]
     )
@@ -57,13 +56,11 @@ def simple_conversation(user_question: str) -> str:
         str: 사용자의 일상적인 질문에 대한 AI의 대답
     """
     output_parser = StrOutputParser()
-    # TODO
-    # 동일한 함수에서 저장된 prompt의 경로만 교체해서 효율성을 높이는 것을 고려해보아야 한다
+
     prompt = ChatPromptTemplate.from_messages(
         [
-            (
-                "system",
-                "당신은 친절한 AI 어시스턴트입니다. 당신의 이름은 SQL 헬퍼 입니다.",
+            SystemMessage(
+                content=load_prompt("prompts/general_conversation/main_v1.prompt")
             ),
             (
                 "human",
@@ -281,52 +278,17 @@ def extract_context(
         # 평가할 context가 없다면 빈 리스트 반환
         return []
 
-    EXTRACT_CONTEXT_MAIN = """당신은 사용자의 입력을 SQL문으로 바꾸어주는 조직의 팀원입니다.
-    당신에게는 사용자의 입력(user_question), 그리고 검색을 통해 가져온 context들이 번호가 매겨진 채로 주어질 것 입니다.
-    당신의 임무는 사용자의 입력을 기반으로 SQL을 생성할 때, 필요한 context의 번호를 추출하여 리스트의 형태로 반환하는 것 입니다.
-    만약 모든 context가 필요 없다면, 빈 리스트를 반환해도 됩니다.\n"""
-
-    EXTRACT_CONTEXT_MAIN_v2 = """당신은 사용자의 질문을 SQL로 변환하는 데 필요한 정보를 식별하는 전문가입니다.
-                
-    당신의 임무:
-    1. 주어진 사용자 질문을 분석하여 SQL 생성에 필요한 정보들을 식별
-    2. 필요한 정보의 인덱스를 정수 리스트로 반환
-
-    입력 형식:
-    - 사용자 질문: SQL로 변환이 필요한 사용자의 질문
-    - context: 사용자 질문을 SQL문으로 변환할 때 사용할 정보들
-
-    반환 형식:
-    - 필요한 context의 인덱스를 담은 정수 리스트
-    - 필요한 context가 없는 경우 빈 리스트
-
-    주의사항:
-    - 인덱스는 제시된 순서대로 정렬하여 반환합니다
-    - SQL 생성에 확실히 필요한 정보만 선택합니다"""
-
-    REEXTRACT_CONTEXT_POSTFIX = """\n**참고사항**\n당신이 이전에 반환한 리스트를 참고하여 SQL문을 만들었으나, 오류가 있었습니다.
-    아래에 주어진 이전에 반환한 리스트(prev_list), 생성된 쿼리문(prev_query), 그리고 오류 메시지(error_msg)를 참고하여, 올바른 context의 번호를 추출하여 리스트의 형태로 반환하세요.
-
-    (prev_list)
-    {prev_list}
-
-    (prev_query)
-    {prev_query}
-
-    (error_msg)
-    {error_msg}"""
-
-    instruction = EXTRACT_CONTEXT_MAIN
+    system_instruction = load_prompt("prompts/table_selection/main_v1.prompt")
 
     if flow_status == "RESELECT":
         print("검색된 테이블 스키마 재검수")
-        instruction += REEXTRACT_CONTEXT_POSTFIX.format(
-            prev_list=prev_list, prev_query=prev_query, error_msg=error_msg
-        )
+        system_instruction += load_prompt(
+            "prompts/table_selection/regen_postfix_v1.prompt"
+        ).format(prev_list=prev_list, prev_query=prev_query, error_msg=error_msg)
 
     prompt = ChatPromptTemplate.from_messages(
         [
-            SystemMessage(content=instruction),
+            SystemMessage(content=system_instruction),
             (
                 "human",
                 "user_question:\n{user_question}\n\ncontext:\n{context}",
@@ -356,7 +318,7 @@ def create_query(
     user_question,
     table_contexts,
     table_contexts_ids,
-    is_valid=True,
+    flow_status="KEEP",
     prev_query="",
     error_msg="",
 ):
@@ -366,48 +328,17 @@ def create_query(
         if idx in set(table_contexts_ids):
             context += table_info + "\n\n"
 
-    GENERAL_QUERY_PREFIX = """당신은 사용자의 입력을 MySQL 쿼리문으로 바꾸어주는 조직의 팀원입니다. 당신의 임무는 DB 이름 그리고 DB내 테이블의 메타 정보가 담긴 아래의 (context)를 이용해서 주어진 질문(user_question)에 걸맞는 MySQL 쿼리문을 작성하는 것입니다.
-
-    (context)
-    {context}
-    """
-
-    GENERAL_QUERY_POSTFIX = """
-    쿼리문 작성 시 주의사항:
-
-    테이블이 어떤 DB에 속하는지 표시해주세요.
-    """
-
-    GENERATE_QUERY_INSTRUCTIONS = (
-        """
-    주어진 질문(user_question)에 대해서 문법적으로 올바른 MySQL 쿼리문을 작성해 주세요.
-    """
-        + GENERAL_QUERY_POSTFIX
+    prefix = load_prompt("prompts/query_creation/prefix_v1.prompt").format(
+        context=context
     )
 
-    FIX_QUERY_INSTRUCTIONS = (
-        """
-    당신은 이전에 사용자에게 쿼리문(prev_query)을 제공했으나, 아래와 같은 에러메시지(error_msg)를 받았습니다.:
+    postfix = load_prompt("prompts/query_creation/postfix_v1.prompt")
 
-    (prev_query)
-    {prev_query}
-
-    (error_msg)
-    {error_msg}
-
-    주어진 질문(user_question)에 대해서 문법적으로 올바른 MySQL 쿼리문을 새로 작성해 주세요.
-    """
-        + GENERAL_QUERY_POSTFIX
-    )
-
-    prompt_prefix = GENERAL_QUERY_PREFIX.format(context=context)
-
-    if is_valid:
-        # TODO
-        # 동일한 함수에서 저장된 prompt의 경로만 교체해서 효율성을 높이는 것을 고려해보아야 한다
+    if flow_status == "KEEP":
+        main_prompt = load_prompt("prompts/query_creation/generate_v1.prompt")
         prompt = ChatPromptTemplate.from_messages(
             [
-                SystemMessage(content=prompt_prefix + GENERATE_QUERY_INSTRUCTIONS),
+                SystemMessage(content=prefix + main_prompt + postfix),
                 (
                     "human",
                     """user_question: {user_question}""",
@@ -415,12 +346,12 @@ def create_query(
             ]
         )
     else:
-        fix_prompt = FIX_QUERY_INSTRUCTIONS.format(
-            prev_query=prev_query, error_msg=error_msg
-        )
+        regen_prompt = load_prompt(
+            "prompts/query_creation/regenerate_v1.prompt"
+        ).format(prev_query=prev_query, result_msg=error_msg)
         prompt = ChatPromptTemplate.from_messages(
             [
-                SystemMessage(content=prompt_prefix + fix_prompt),
+                SystemMessage(content=prefix + regen_prompt + postfix),
                 ("human", """user_question: {user_question}"""),
             ]
         )
@@ -531,21 +462,9 @@ def get_query_result(command, fetch, include_columns=False):
 def business_conversation(user_question, sql_query, query_result) -> str:
     output_parser = StrOutputParser()
 
-    BUSINESS_CONV_INSTRUCTION = """당신은 친절한 데이터 분석 전문가 입니다.
-    당신의 임무는 사용자의 질문을 참고하여 만들어진 SQL 쿼리문(sql_query)과 결과(result)를 활용하여 사용자의 질문(user_question)에 대해서 대답하는 것 입니다.
-
-    (sql_query)
-    {sql_query}
-
-    (result)
-    {query_result}
-    """
-
-    instruction = BUSINESS_CONV_INSTRUCTION.format(
+    instruction = load_prompt("prompts/sql_conversation/main_v1.prompt").format(
         sql_query=sql_query, query_result=query_result
     )
-    # TODO
-    # 동일한 함수에서 저장된 prompt의 경로만 교체해서 효율성을 높이는 것을 고려해보아야 한다
     prompt = ChatPromptTemplate.from_messages(
         [
             SystemMessage(content=instruction),
