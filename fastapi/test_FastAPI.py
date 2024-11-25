@@ -101,22 +101,17 @@ async def query(query: str = Form(...)):
     print(sql_query)
     pattern = r"(?<=\n).*(?=;)"
     result = re.search(pattern, sql_query).group()
-    # result_list = sql_query.split(r"```")
-    # start_index = result_list[1].find("SELECT")
-    # end_index = result_list[1].find(";")
 
     # 변환된 SQL을 MySQL에 실행
     print(result)
     db_result = execute_sql(result)
 
     return {"natural_query": query, "sql_query": sql_query, "db_result": db_result}
-    # return result_list[1][start_index : end_index + 1]
-
 
 # 기본 경로 처리
 @app.get("/")
 async def read_root():
-    return {"message": "Welcome to the slq-helper application!"}
+    return {"message": "Welcome to the sql-helper application!"}
 
 
 # 쿼리를 입력하는 HTML구성 창으로 접속 처리
