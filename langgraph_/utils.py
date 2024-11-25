@@ -9,3 +9,42 @@ def get_runnable_config(recursion_limit: int, thread_id: str) -> RunnableConfig:
         recursion_limit=recursion_limit, configurable={"thread_id": thread_id}
     )
     return config
+
+
+class EmptyQueryResultError(Exception):
+    def __init__(self):
+        self.msg = "No rows returned by the SQL query."
+
+    def __str__(self):
+        return self.msg
+
+    # SQLAlchemy 에서 에러메시지를 출력하기 위한 메서드
+    def _message(self):
+        return self.msg
+
+
+class NullQueryResultError(Exception):
+    def __init__(self):
+        self.msg = "SQL query only returns NULL for every column."
+
+    def __str__(self):
+        return self.msg
+
+    # SQLAlchemy 에서 에러메시지를 출력하기 위한 메서드
+    def _message(self):
+        return self.msg
+
+
+def load_prompt(prompt_path: str) -> str:
+    """
+    입력된 경로에 존재하는 프롬프트 파일을 로드합니다.
+
+    Args:
+        prompt_path (str): 프롬프트 파일의 경로.
+
+    Returns:
+        str: 로드된 프롬프트 내용.
+    """
+    with open(f"./{prompt_path}", "r", encoding="utf-8") as f:
+        prompt = f.read()
+    return prompt

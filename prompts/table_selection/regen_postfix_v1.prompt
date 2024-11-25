@@ -1,0 +1,11 @@
+**참고사항**\n당신이 이전에 반환한 리스트를 참고하여 SQL문을 만들었으나, 오류가 있었습니다.
+아래에 주어진 이전에 반환한 리스트(prev_list), 생성된 쿼리문(prev_query), 그리고 오류 메시지(error_msg)를 참고하여, 올바른 context의 번호를 추출하여 리스트의 형태로 반환하세요.
+
+(prev_list)
+{prev_list}
+
+(prev_query)
+{prev_query}
+
+(error_msg)
+{error_msg}

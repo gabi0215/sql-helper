@@ -1,4 +1,5 @@
 from typing import TypedDict, List, Any
+from .utils import EmptyQueryResultError, NullQueryResultError
 from .task import (
     evaluate_user_question,
     simple_conversation,
@@ -32,7 +33,7 @@ class GraphState(TypedDict):
     need_clarification: bool  # 사용자 추가 질문(설명)이 필요한지 여부
     sample_info: int
     sql_query: str
-    is_valid: bool
+    flow_status: str  # KEEP, REGENERATE, RE-RETRIEVE, RESELECT, RE-REQUEST
     max_query_fix: int
     query_fix_cnt: int
     query_result: List[Any]
@@ -133,6 +134,7 @@ def table_selection(state: GraphState) -> GraphState:
     """
     user_qusetion = state["user_question"]
     context_cnt = state["context_cnt"]
+    flow_status = state.get("flow_status", "KEEP")
     sample_info = state["sample_info"]
     vector_store = get_vector_stores(sample_info)["db_info"]  # table_ddl + 실제 데이터
     # vector_store = get_vector_stores()["table_info"]  # table_ddl
@@ -143,12 +145,26 @@ def table_selection(state: GraphState) -> GraphState:
         user_question=user_qusetion, context_cnt=context_cnt, vector_store=vector_store
     )
     # 검색된 context를 검수
-    table_contexts_ids = extract_context(
-        user_question=user_qusetion, table_contexts=table_contexts
-    )
+    if flow_status == "RESELECT":
+        prev_list = state["table_contexts_ids"]
+        prev_query = state["sql_query"]
+        error_msg = state["error_msg"]
+        table_contexts_ids = extract_context(
+            user_question=user_qusetion,
+            table_contexts=table_contexts,
+            flow_status=flow_status,
+            prev_list=prev_list,
+            prev_query=prev_query,
+            error_msg=error_msg,
+        )
+    else:
+        table_contexts_ids = extract_context(
+            user_question=user_qusetion, table_contexts=table_contexts
+        )
     return GraphState(
         table_contexts=table_contexts,
         table_contexts_ids=table_contexts_ids,
+        flow_status=flow_status,
     )  # type: ignore
 
 
@@ -157,39 +173,75 @@ def query_creation(state: GraphState) -> GraphState:
     table_contexts = state["table_contexts"]
     table_contexts_ids = state["table_contexts_ids"]
 
-    query_fix_cnt = state.get("query_fix_cnt", 0)
-    is_valid = state.get("is_valid", True)
+    query_fix_cnt = state.get("query_fix_cnt")
+    flow_status = state.get("flow_status", "KEEP")
 
-    if is_valid:
-        sql_query = create_query(user_qusetion, table_contexts, table_contexts_ids)
-
-    else:
+    if flow_status == "REGENERATE":
         prev_query = state["sql_query"]
         error_msg = state["error_msg"]
+        print("Do Query Fix!!!")
         sql_query = create_query(
             user_qusetion,
             table_contexts,
             table_contexts_ids,
-            is_valid=is_valid,
+            flow_status=flow_status,
             prev_query=prev_query,
             error_msg=error_msg,
         )
 
+    else:
+        sql_query = create_query(user_qusetion, table_contexts, table_contexts_ids)
+
     return GraphState(
         sql_query=sql_query,
         query_fix_cnt=query_fix_cnt + 1,
-        is_valid=is_valid,
+        flow_status=flow_status,
     )  # type: ignore
 
 
 def query_validation(state: GraphState) -> GraphState:
     sql_query = state["sql_query"]
+    query_fix_cnt = state["query_fix_cnt"]
+    max_query_fix = state["max_query_fix"]
     try:
         query_result = get_query_result(command=sql_query, fetch="all")
-        return GraphState(query_result=query_result)  # type: ignore
+        return GraphState(
+            query_result=query_result,
+            flow_status="KEEP",
+        )  # type: ignore
 
     except Exception as e:
-        return GraphState(is_valid=False, error_msg=e)  # type: ignore
+        # 지정된 최대 재생성 횟수를 넘어서면 사이클 중단
+        if query_fix_cnt >= max_query_fix:
+
+            return GraphState(
+                flow_status="KEEP",
+                query_result=e._message(),
+            )  # type: ignore
+
+        else:
+
+            if isinstance(e, NullQueryResultError):
+                # 쿼리문 결과가 모두 NULL인 경우 -> 테이블 재선택
+                print("Null Query Result Error")
+                return GraphState(
+                    flow_status="RESELECT",
+                    error_msg=e._message(),
+                )  # type: ignore
+
+            elif isinstance(e, EmptyQueryResultError):
+                # 쿼리문 결과가 없는 경우 -> 테이블 재선택
+                print("Empty Query Result Error")
+                return GraphState(
+                    flow_status="RESELECT",
+                    error_msg=e._message(),
+                )  # type: ignore
+            else:
+                # 쿼리문의 문법 오류 -> 쿼리문 재생성
+                return GraphState(
+                    flow_status="REGENERATE",
+                    error_msg=e._message(),
+                )  # type: ignore
 
 
 def sql_conversation(state: GraphState) -> GraphState:
@@ -231,12 +283,12 @@ def user_question_analyze_checker(state: GraphState) -> str:
 
 
 def query_checker(state: GraphState) -> str:
-    is_valid = state["is_valid"]
+    flow_status = state["flow_status"]
     max_query_fix = state["max_query_fix"]
     query_fix_cnt = state["query_fix_cnt"]
 
     # 정해진 최대 재생성 횟수를 넘어서면 pass
-    if is_valid or query_fix_cnt >= max_query_fix:
+    if flow_status == "KEEP" or query_fix_cnt >= max_query_fix:
         return "KEEP"
     else:
-        return "REGENERATE"
+        return flow_status

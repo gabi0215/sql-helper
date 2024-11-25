@@ -59,7 +59,11 @@ def make_graph() -> CompiledStateGraph:
     workflow.add_conditional_edges(
         "sql_query_validation",
         query_checker,
-        {"KEEP": "response", "REGENERATE": "sql_query_generation"},
+        {
+            "KEEP": "response",
+            "REGENERATE": "sql_query_generation",
+            "RESELECT": "table_selection",
+        },
     )
 
     workflow.add_edge("response", END)

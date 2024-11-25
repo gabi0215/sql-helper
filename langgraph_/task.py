@@ -2,12 +2,13 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.vectorstores import VectorStore
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.sql.expression import Executable
 from sqlalchemy.engine import Result
 
+from .utils import EmptyQueryResultError, NullQueryResultError, load_prompt
 from typing import List, Any, Union, Sequence, Dict
 from pydantic import BaseModel, Field
 import os, re
@@ -27,13 +28,12 @@ def evaluate_user_question(user_question: str) -> str:
     output_parser = StrOutputParser()
     prompt = ChatPromptTemplate.from_messages(
         [
-            (
-                "system",
-                "당신은 사용자의 입력을 SQL문으로 바꾸어주는 조직의 팀원입니다. 당신의 임무는 주어진 질문(user_question)이 데이터 또는 비즈니스와 관련된 일인지를 판단하는 것 입니다.",
+            SystemMessage(
+                content=load_prompt("prompts/question_evaluation/main_v1.prompt")
             ),
             (
                 "human",
-                "주어진 질문(user_question)이 데이터 또는 비즈니스와 관련되어 있으면 1, 아니면 0을 출력하세요. `1`과 같이 결과만 작성하세요.\n\n#질문(user_question): {user_question}",
+                "질문(user_question): {user_question}",
             ),
         ]
     )
@@ -56,13 +56,11 @@ def simple_conversation(user_question: str) -> str:
         str: 사용자의 일상적인 질문에 대한 AI의 대답
     """
     output_parser = StrOutputParser()
-    # TODO
-    # 동일한 함수에서 저장된 prompt의 경로만 교체해서 효율성을 높이는 것을 고려해보아야 한다
+
     prompt = ChatPromptTemplate.from_messages(
         [
-            (
-                "system",
-                "당신은 친절한 AI 어시스턴트입니다. 당신의 이름은 SQL 헬퍼 입니다.",
+            SystemMessage(
+                content=load_prompt("prompts/general_conversation/main_v1.prompt")
             ),
             (
                 "human",
@@ -258,7 +256,14 @@ def select_relevant_tables(
     return table_contexts
 
 
-def extract_context(user_question: str, table_contexts: List[str]) -> List[int]:
+def extract_context(
+    user_question: str,
+    table_contexts: List[str],
+    flow_status: str = "KEEP",
+    prev_list: List[int] = [],
+    prev_query: str = "",
+    error_msg: str = "",
+) -> List[int]:
     """벡터 스토어에서 검색으로 얻어낸 context들을 대상으로 사용자의 질문(user_question)에 기반한 SQL문을 생성함에 있어 필요한지를 판단한 후,
     필요한 context의 인덱스를 담은 리스트를 반환하는 함수입니다.
 
@@ -273,35 +278,20 @@ def extract_context(user_question: str, table_contexts: List[str]) -> List[int]:
         # 평가할 context가 없다면 빈 리스트 반환
         return []
 
+    system_instruction = load_prompt("prompts/table_selection/main_v1.prompt")
+
+    if flow_status == "RESELECT":
+        print("검색된 테이블 스키마 재검수")
+        system_instruction += load_prompt(
+            "prompts/table_selection/regen_postfix_v1.prompt"
+        ).format(prev_list=prev_list, prev_query=prev_query, error_msg=error_msg)
+
     prompt = ChatPromptTemplate.from_messages(
         [
-            (
-                "system",
-                """당신은 사용자의 질문을 SQL로 변환하는 데 필요한 정보를 식별하는 전문가입니다.
-                
-                당신의 임무:
-                1. 주어진 사용자 질문을 분석하여 SQL 생성에 필요한 정보들을 식별
-                2. 필요한 정보의 인덱스를 정수 리스트로 반환
-
-                입력 형식:
-                - 사용자 질문: SQL로 변환이 필요한 사용자의 질문
-                - context: 사용자 질문을 SQL문으로 변환할 때 사용할 정보들
-
-                반환 형식:
-                - 필요한 context의 인덱스를 담은 정수 리스트
-                - 필요한 context가 없는 경우 빈 리스트
-
-                주의사항:
-                - 인덱스는 제시된 순서대로 정렬하여 반환합니다
-                - SQL 생성에 확실히 필요한 정보만 선택합니다""",
-            ),
+            SystemMessage(content=system_instruction),
             (
                 "human",
-                """user_question:
-                {user_question}
-                
-                context:
-                {context}""",
+                "user_question:\n{user_question}\n\ncontext:\n{context}",
             ),
         ]
     )
@@ -309,7 +299,7 @@ def extract_context(user_question: str, table_contexts: List[str]) -> List[int]:
     llm = ChatOpenAI(model="gpt-4o-mini")
 
     class context_list(BaseModel):
-        """사용자 질문에 답하기 위해 필요한 맥락의 인덱스 목록"""
+        """Index list of the context which is necessary for answering user_question."""
 
         ids: List[int | None] = Field(description="Ids of contexts.")
 
@@ -328,7 +318,7 @@ def create_query(
     user_question,
     table_contexts,
     table_contexts_ids,
-    is_valid=True,
+    flow_status="KEEP",
     prev_query="",
     error_msg="",
 ):
@@ -338,48 +328,17 @@ def create_query(
         if idx in set(table_contexts_ids):
             context += table_info + "\n\n"
 
-    GENERAL_QUERY_PREFIX = """당신은 사용자의 입력을 MySQL 쿼리문으로 바꾸어주는 조직의 팀원입니다. 당신의 임무는 DB 이름 그리고 DB내 테이블의 메타 정보가 담긴 아래의 (context)를 이용해서 주어진 질문(user_question)에 걸맞는 MySQL 쿼리문을 작성하는 것입니다.
-
-    (context)
-    {context}
-    """
-
-    GENERAL_QUERY_POSTFIX = """
-    쿼리문 작성 시 주의사항:
-
-    모든 테이블의 DB를 db.table 처럼 표시해주세요.
-    """
-
-    GENERATE_QUERY_INSTRUCTIONS = (
-        """
-    주어진 질문(user_question)에 대해서 문법적으로 올바른 MySQL 쿼리문을 작성해 주세요.
-    """
-        + GENERAL_QUERY_POSTFIX
+    prefix = load_prompt("prompts/query_creation/prefix_v1.prompt").format(
+        context=context
     )
 
-    FIX_QUERY_INSTRUCTIONS = (
-        """
-    당신은 이전에 사용자에게 쿼리문(prev_query)을 제공했으나, 아래와 같은 에러메시지(error_msg)를 받았습니다.:
+    postfix = load_prompt("prompts/query_creation/postfix_v1.prompt")
 
-    (prev_query)
-    {prev_query}
-
-    (error_msg)
-    {error_msg}
-
-    주어진 질문(user_question)에 대해서 문법적으로 올바른 MySQL 쿼리문을 새로 작성해 주세요.
-    """
-        + GENERAL_QUERY_POSTFIX
-    )
-
-    prompt_prefix = GENERAL_QUERY_PREFIX.format(context=context)
-
-    if is_valid:
-        # TODO
-        # 동일한 함수에서 저장된 prompt의 경로만 교체해서 효율성을 높이는 것을 고려해보아야 한다
+    if flow_status == "KEEP":
+        main_prompt = load_prompt("prompts/query_creation/generate_v1.prompt")
         prompt = ChatPromptTemplate.from_messages(
             [
-                SystemMessage(content=prompt_prefix + GENERATE_QUERY_INSTRUCTIONS),
+                SystemMessage(content=prefix + main_prompt + postfix),
                 (
                     "human",
                     """user_question: {user_question}""",
@@ -387,12 +346,12 @@ def create_query(
             ]
         )
     else:
-        fix_prompt = FIX_QUERY_INSTRUCTIONS.format(
-            prev_query=prev_query, error_msg=error_msg
-        )
+        regen_prompt = load_prompt(
+            "prompts/query_creation/regenerate_v1.prompt"
+        ).format(prev_query=prev_query, result_msg=error_msg)
         prompt = ChatPromptTemplate.from_messages(
             [
-                SystemMessage(content=prompt_prefix + fix_prompt),
+                SystemMessage(content=prefix + regen_prompt + postfix),
                 ("human", """user_question: {user_question}"""),
             ]
         )
@@ -407,6 +366,20 @@ def create_query(
         sql_query = re.search(r"SELECT.*?;", output, re.DOTALL).group(1)
 
     return sql_query
+
+
+def check_query_result(result: Sequence[Dict[str, Any]]) -> Exception | None:
+
+    if not result:
+        # 쿼리문 결과가 빈 리스트이면, 에러 발생
+        raise EmptyQueryResultError()
+
+    for row in result:
+        # 쿼리문 결과 row 중 하나라도 NULL이면, 통과
+        if not all(value is None for value in row.values()):
+            return None
+    # 쿼리문 결과 row 중 모두 NULL 인 경우, 에러 발생
+    raise NullQueryResultError()
 
 
 def execute_query(command: str | Executable, fetch="all") -> Union[Sequence[Dict[str, Any]], Result]:  # type: ignore
@@ -445,6 +418,7 @@ def execute_query(command: str | Executable, fetch="all") -> Union[Sequence[Dict
                 raise ValueError(
                     "Fetch parameter must be either 'one', 'all', or 'cursor'"
                 )
+            check_query_result(result)
             return result
 
 
@@ -488,21 +462,9 @@ def get_query_result(command, fetch, include_columns=False):
 def business_conversation(user_question, sql_query, query_result) -> str:
     output_parser = StrOutputParser()
 
-    BUSINESS_CONV_INSTRUCTION = """당신은 친절한 데이터 분석 전문가 입니다.
-    당신의 임무는 사용자의 질문을 참고하여 만들어진 SQL 쿼리문(sql_query)과 결과(result)를 활용하여 사용자의 질문(user_question)에 대해서 대답하는 것 입니다.
-
-    (sql_query)
-    {sql_query}
-
-    (result)
-    {query_result}
-    """
-
-    instruction = BUSINESS_CONV_INSTRUCTION.format(
+    instruction = load_prompt("prompts/sql_conversation/main_v1.prompt").format(
         sql_query=sql_query, query_result=query_result
     )
-    # TODO
-    # 동일한 함수에서 저장된 prompt의 경로만 교체해서 효율성을 높이는 것을 고려해보아야 한다
     prompt = ChatPromptTemplate.from_messages(
         [
             SystemMessage(content=instruction),
@@ -517,61 +479,3 @@ def business_conversation(user_question, sql_query, query_result) -> str:
 
     output = chain.invoke({"user_question": user_question})
     return output
-
-
-##################### Experimental #####################
-
-
-def do_embodiment(user_question: str) -> str:
-    """데이터 및 비즈니스 관련 질문으로 판단된 사용자의 질문을 구체화하는 함수입니다.
-    구체화를 어떤 식으로 진행할지는 아직 정해지지 않았으니, 일단은 사용자의 질문을 2배로 늘린 결과를 return 합니다.
-
-    Args:
-        user_question (str): 데이터 및 비즈니스 관련 사용자의 질문
-
-    Returns:
-        str: 사용자의 질문을 구체화한 결과
-    """
-
-    return user_question * 2
-
-
-def do_extraction(user_question: str) -> list:
-    """데이터 및 비즈니스 관련 질문으로 판단된 사용자의 질문에서 필요한 정보들을 추출하는 함수입니다.
-    정보 추출을 어떤 식으로 진행할지는 아직 정해지지 않았으니, 일단은 사용자의 질문을 띄어쓰기 기준으로 split 한 결과를 return 합니다.
-
-    Args:
-        user_question (str): 데이터 및 비즈니스 관련 사용자의 질문
-
-    Returns:
-        list: 사용자의 질문에서 추출된 정보
-    """
-    return user_question.split()
-
-
-def do_category_classification(
-    user_question: str, embodied_question: str, extracted_data: list[str]
-) -> str:
-    """사용자의 질문에 대해서 우리가 정의한 기능 중 어떤 기능으로 대응해야 하는지 분류해주는 함수입니다.
-    사용할 모델 또는 api 에 따라서 입력에 필요한 데이터가 달라질 수 있으며, 일단은 모두 입력 받아오도록 만들었습니다.
-    아직 데이터 및 라벨에 대한 정의가 존재하지 않으니 임의로 생성하여 랜덤한 값을 return 합니다.
-
-    Args:
-        user_question (str): 데이터 및 비즈니스 관련 사용자의 질문
-        embodied_question (str): 사용자의 질문을 구체화한 결과
-        extracted_data (list[str]): 사용자의 질문에서 추출된 정보
-
-    Returns:
-        str: 기능 분류 결과
-    """
-
-    from random import choice
-
-    labels = [
-        "쿼리문 생성",
-        "쿼리문 해설",
-        "테이블 해설",
-        "쿼리문 문법 검증",
-        "테이블 및 컬럼 활용 안내",
-    ]
-    return choice(labels)
