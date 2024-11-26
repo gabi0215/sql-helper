@@ -4,6 +4,9 @@ import uvicorn
 
 from langgraph_.graph import make_graph, multiturn_test, make_graph_for_test
 from langgraph_.utils import get_runnable_config
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 
