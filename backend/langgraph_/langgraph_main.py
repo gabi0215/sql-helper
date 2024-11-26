@@ -2,8 +2,8 @@ import argparse
 from dotenv import load_dotenv
 
 from .node import GraphState
-from .graph import make_graph
-from .utils import get_runnable_config
+from .graph import make_graph, make_graph_for_test
+from .utils import get_runnable_config, str2bool
 from .faiss_init import get_vector_stores
 
 
@@ -47,12 +47,18 @@ def get_config():
         type=int,
     )
 
+    parser.add_argument(
+        "--test",
+        default=True,
+        type=str2bool,
+    )
+
     config = parser.parse_args()
 
     return config
 
 
-def text2sql(user_input):
+def text2sql(user_input, test: bool = True):
     # config 설정
     config = get_config()
     runnable_config = get_runnable_config(
@@ -60,7 +66,10 @@ def text2sql(user_input):
     )
 
     # graph 생성
-    graph = make_graph()
+    if test:
+        graph = make_graph_for_test()
+    else:
+        graph = make_graph()
 
     # 입력을 위해 그래프 상태 만들기
     inputs = GraphState(user_question=user_input, context_cnt=config.context_cnt, max_query_fix=config.max_query_fix, query_fix_cnt=config.query_fix_cnt, sample_info=config.sample_info)  # type: ignore
@@ -74,4 +83,4 @@ if __name__ == "__main__":
 
     config = get_config()
 
-    print(text2sql(user_input=config.user_question))
+    print(text2sql(user_input=config.user_question, test=config.test))
