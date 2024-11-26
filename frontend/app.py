@@ -31,7 +31,13 @@ if st.button("Enter"):
         if response.status_code == 200:
             processed_info = response.json()
             st.session_state.snapshot_values = processed_info
+            ask_user = processed_info["ask_user"]
             st.session_state.initial_question = 0
+            output = processed_info["collected_questions"][-1]
+            # 사용자에게 질문을 요청하지 않았는데 답을 받은 경우 = workflow 완료
+            if ask_user == 0:
+                st.session_state.initial_question = 1
+                output = processed_info["final_answer"]
         else:
             st.error("서버 처리 중 오류가 발생했습니다.")
     except requests.exceptions.RequestException as e:
@@ -39,11 +45,11 @@ if st.button("Enter"):
 
     # 일단은 유저의 입력만 다시 출력
     st.write("Response 전체 내용:")
-    st.write(processed_info["final_answer"])
+    st.write(output)
 
     # 대화 기록에 추가
     st.session_state.conversation_history.append(
-        {"question": user_input, "response": processed_info["final_answer"]}
+        {"question": user_input, "response": output}
     )
 
 # 대화 기록 표시

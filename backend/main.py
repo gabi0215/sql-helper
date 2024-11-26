@@ -8,7 +8,7 @@ from langgraph_.utils import get_runnable_config
 app = FastAPI()
 
 # make_graph: 전체 과정, make_graph_for_test: 질문 구체화 생략, multiturn_test: 질문 구체화만 진행
-workflow = make_graph_for_test()
+workflow = make_graph()
 print("LLM WORKFLOW STARTED.")
 
 
@@ -31,11 +31,31 @@ def llm_workflow(workflow_input: LLMWorkflowInput):
         "query_fix_cnt": -1,
         "sample_info": 3,
     }
-
-    outputs = workflow.invoke(
-        input=inputs,
-        config=config,
-    )
+    # 초기 질문이 아닌 경우
+    if processed_input["initial_question"] == 0:
+        values = processed_input["last_snapshot_values"]
+        values["collected_questions"][
+            -1
+        ] += f"\n답변: {processed_input['user_question']}"
+        workflow.update_state(
+            config,
+            values,
+            "additional_questions",
+        )
+        outputs = workflow.invoke(
+            input=None,
+            config=config,
+            interrupt_before=["human_feedback"],
+        )
+    else:  # 초기 질문인 경우
+        # TODO
+        # 첫 번째 초기질문은 잘 작동하나 두번째 초기질문에서 GraphState가 초기화되지 않는 문제 발생
+        outputs = workflow.invoke(
+            input=inputs,
+            config=config,
+            interrupt_before=["human_feedback"],
+        )
+    print(outputs)
     return outputs
 
 
