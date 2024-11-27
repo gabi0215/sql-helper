@@ -36,8 +36,14 @@ An AI system that provides:
 # Installation and Setup
 ## Frontend Setup Guide
 
+0. Clone and start application:
+```bash
+git clone https://github.com/100suping/sql-helper.git
+```
+
 1. Run environment setup script:
 ```bash
+cd sql-helper/frontend
 chmod +x frontend_env_setup.sh
 ./frontend_env_setup.sh
 ```
@@ -46,9 +52,9 @@ chmod +x frontend_env_setup.sh
 ```bash
 pyenv activate frontend
 ```
-3. Clone and start application:
-```bash
-git clone -b refactor https://github.com/100suping/sql-helper.git
+
+3. Start application:
+```   
 cd sql-helper/frontend
 pip install -r requirements.txt
 streamlit run app.py
@@ -59,12 +65,16 @@ streamlit run app.py
 
 1. Install CUDA and NVIDIA drivers:
 ```bash
+cd sql-helper/backend/GPUsetting
 chmod +x cuda_install.sh
 ./cuda_install.sh
 # System will reboot
 ```
+Note: Server requires reboot after CUDA installation. Ensure all commands are executed in order.
+
 2. After reboot, install PyEnv dependencies:
 ```bash
+cd sql-helper/backend/GPUsetting
 chmod +x pyenv_dependencies.sh
 ./pyenv_dependencies.sh
 ```
@@ -87,23 +97,16 @@ nvidia-smi
 # Should show NVIDIA L4 GPU info
 ```
 
-6. Setup backend application:
+## Backend Application Setup
+1. Setup backend application:
 ```bash
-pyenv activate backend
-git clone -b refactor https://github.com/100suping/sql-helper.git
 cd sql-helper/backend
 chmod +x backend_env_setup.sh
 ./backend_env_setup.sh
-python main.py
-
 ```
-Note: Server requires reboot after CUDA installation. Ensure all commands are executed in order.
 
-
-
-## Configure Environment Variables:
-Create .env file:
-
+2. Configure environment variables:
+Create .env file in project root:
 ```
 OPENAI_API_KEY="your-api-key"
 LANGCHAIN_API_KEY="your-api-key"
@@ -113,36 +116,51 @@ URL="your-mysql-database-url"
 HUGGINGFACE_TOKEN='your-huggingface-token"
 ```
 
+3. Start backend:
+```
+python main.py
+```
+
 ## Project Structure
 ```
 sql-helper/
-├── frontend/                  # Frontend application
-│   ├── app.py                # Streamlit web interface
+├── frontend/
+│   ├── app.py                # Streamlit interface
 │   ├── requirements.txt      # Frontend dependencies
-│   └── README.md            # Frontend documentation
-│
-├── backend/                  # Backend services
-│   └── langgraph_           # LangGraph implementation
-│       ├── init.py        # Package initialization
-│       ├── faiss_init.py    # Vector database initialization
-│       ├── graph.py         # Conversation flow control
-│       ├── node.py          # Graph node definitions
-│       ├── task.py          # Task implementations
-│       └── utils.py         # Utility functions
-│
-├── prompts/                  # LLM prompt templates
-│   ├── additional_question/  # Follow-up question prompts
-│   ├── general_conversation/ # Basic conversation handling
-│   ├── query_creation/      # SQL generation prompts
-│   ├── question_analysis/   # Query intent analysis
-│   ├── question_evaluation/ # Input quality check
-│   ├── question_refinement/ # Query improvement
-│   ├── sql_conversation/    # SQL results discussion
-│   └── table_selection/     # DB table selection logic
-│
-├── frontend_env_setup.sh     # Environment setup script
-├── main.py                  # Application entry point
-├── README.md                # Project documentation
-├── requirements.txt         # Project dependencies
-└── .gitignore              # Git ignore rules
+│   ├── README.md            # Frontend docs
+│   └── frontend_env_setup.sh # Frontend setup script
+├── backend/
+│   ├── GPUsetting/          # GPU/CUDA setup scripts
+│   │   ├── cuda_install.sh
+│   │   ├── pyenv_dependencies.sh
+│   │   ├── pyenv_setup.sh
+│   │   └── pyenv_virtualenv.sh
+│   ├── langgraph_/          # Core backend logic
+│   │   ├── init.py
+│   │   ├── faiss_init.py
+│   │   ├── graph.py
+│   │   ├── node.py
+│   │   ├── task.py
+│   │   └── utils.py
+│   ├── prompts/             # LLM prompts
+│   │   ├── additional_question/
+│   │   ├── general_conversation/
+│   │   ├── query_creation/
+│   │   ├── question_analysis/
+│   │   ├── question_evaluation/
+│   │   ├── question_refinement/
+│   │   ├── sql_conversation/
+│   │   └── table_selection/
+│   ├── backend_env_setup.sh # Backend setup script
+│   ├── main.py             # Backend entry point
+│   ├── README.md           # Backend docs
+│   └── requirements.txt    # Backend dependencies
+├── .env                    # Environment variables for backend
+├── README.md              # Project documentation
+└── .gitignore
+
+Note: `.env` file should be placed in project root and backend directory needs access to it for database and API configurations.
+
 ```
+
+
