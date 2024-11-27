@@ -86,13 +86,15 @@ chmod +x pyenv_setup.sh
 ./pyenv_setup.sh
 ```
 
-4.Create Python environment:
+
+4. Create Python environment:
 ```bash
 chmod +x pyenv_virtualenv.sh
 ./pyenv_virtualenv.sh
 # Enter Python version: 3.11.8
 # Enter environment name: backend
 ```
+
 5. Verify GPU setup:
 ```bash
 nvidia-smi
