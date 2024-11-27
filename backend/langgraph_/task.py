@@ -260,6 +260,7 @@ def extract_context(
     output = chain.invoke({"user_question": user_question, "context": context})
     return output.ids  # type: ignore
 
+
 def create_query(
     user_question,
     table_contexts,

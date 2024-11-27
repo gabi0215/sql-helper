@@ -71,9 +71,9 @@ def str2bool(v):
 def load_qwen_model():
     # Hugging Face 토큰 설정
     load_dotenv()
-    
+
     # 환경 변수에서 Hugging Face 토큰 가져오기
-    huggingface_token = os.getenv('HUGGINGFACE_TOKEN')
+    huggingface_token = os.getenv("HUGGINGFACE_TOKEN")
     login(token=huggingface_token)
 
     # 모델 이름 설정
