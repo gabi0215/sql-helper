@@ -34,34 +34,6 @@ An AI system that provides:
 
 
 # Installation and Setup
-## Frontend Setup Guide
-
-0. Clone and start application:
-```bash
-git clone https://github.com/100suping/sql-helper.git
-```
-
-1. Run environment setup script:
-```bash
-cd sql-helper/frontend
-chmod +x frontend_env_setup.sh
-./frontend_env_setup.sh
-```
-
-2. Open new terminal and activate environment:
-```bash
-pyenv activate frontend
-```
-
-## Frontend Application run
-
-0. Start application:
-```   
-cd sql-helper/frontend
-pip install -r requirements.txt
-streamlit run app.py
-```
-
 ## Backend Setup Guide
 ### GPU Server Initial Setup
 
@@ -123,6 +95,34 @@ HUGGINGFACE_TOKEN='your-huggingface-token"
 3. Start backend:
 ```
 python main.py
+```
+
+## Frontend Setup Guide
+
+0. Clone and start application:
+```bash
+git clone https://github.com/100suping/sql-helper.git
+```
+
+1. Run environment setup script:
+```bash
+cd sql-helper/frontend
+chmod +x frontend_env_setup.sh
+./frontend_env_setup.sh
+```
+
+2. Open new terminal and activate environment:
+```bash
+pyenv activate frontend
+```
+
+## Frontend Application run
+
+0. Start application:
+```   
+cd sql-helper/frontend
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
 ## Project Structure
