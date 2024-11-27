@@ -5,6 +5,22 @@ An AI system that provides:
 - SQL → Natural Language: Explain query results in plain language
 - Interactive Refinement: Multi-turn conversation to improve query accuracy
 
+## Required Files
+### Database Dump
+Download the MySQL dump file from [Release v1.0](https://github.com/100suping/sql-helper/releases/tag/mysql-dump)
+Import database:
+```bash
+mysql -u your_user -p your_database < dump.sql
+```
+
+## LLM Models Used
+### Main Model
+- [100suping/Qwen2.5-Coder-34B-Instruct-kosql-adapter](https://huggingface.co/100suping/Qwen2.5-Coder-34B-Instruct-kosql-adapter)
+ - Fine-tuned for SQL generation and natural language interaction
+ - Optimized for Korean language support
+ - Access requires Hugging Face token
+   
+
 ### Core Components
 - Frontend: Streamlit web interface
 - Backend: LangGraph query generation
@@ -31,6 +47,7 @@ An AI system that provides:
 - Port 8501: Streamlit web interface access
 - Port 8000: Backend FastAPI server access 
 - Port 3306: MySQL database connection
+
 
 
 # Installation and Setup
