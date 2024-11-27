@@ -183,9 +183,9 @@ Note: `.env` file should be placed in project root and backend directory needs a
  - Optimized for Korean language support
  - Access requires Hugging Face token
 
-## Dataset
-We provide fine-tuning dataset at [Sessac101/sql-helper-tone-QA](https://huggingface.co/datasets/Sessac101/sql-helper-tone-QA/tree/main):
+## Training Datasets
 
+- [Sessac101/sql-helper-tone-QA](https://huggingface.co/datasets/Sessac101/sql-helper-tone-QA)
 - Modified BIRD dataset with Korean translations
  - Cleaned and merged schema
  - Added Korean Q&A pairs
@@ -194,7 +194,9 @@ We provide fine-tuning dataset at [Sessac101/sql-helper-tone-QA](https://hugging
    - `merged_cleaned_addschema.json`: Dataset with schema
    - `모범 QA - 시트1.csv`: 50 curated Q&A pairs
 
-Dataset can be used for:
-- Model fine-tuning
-- Testing system accuracy
-- Example queries showcase   
+- [won75/text_to_sql_ko](https://huggingface.co/datasets/won75/text_to_sql_ko)
+ - Korean text-to-SQL dataset
+ - Used for enhancing Korean language support
+ - Based on Spider dataset
+
+Both datasets were used for fine-tuning our model for improved Korean SQL generation.
