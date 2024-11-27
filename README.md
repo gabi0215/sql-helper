@@ -64,7 +64,7 @@ chmod +x pyenv_dependencies.sh
 ```
 3. Setup PyEnv:
 ```bash
-Copychmod +x pyenv_setup.sh
+chmod +x pyenv_setup.sh
 ./pyenv_setup.sh
 ```
 
@@ -104,6 +104,7 @@ LANGCHAIN_API_KEY="your-api-key"
 LANGCHAIN_TRACING_V2=false
 LANGCHAIN_PROJECT="your-project-name"
 URL="your-mysql-database-url"
+HUGGINGFACE_TOKEN='your-huggingface-token"
 ```
 
 ## Project Structure
