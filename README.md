@@ -36,12 +36,12 @@ chmod +x frontend_env_setup.sh
 ./frontend_env_setup.sh```
 
 2. Open new terminal and activate environment:
-```
-bashCopypyenv activate frontend
+```bash
+pyenv activate frontend
 ```
 3. Clone and start application:
-```
-bashCopygit clone -b refactor https://github.com/100suping/sql-helper.git
+```bash
+git clone -b refactor https://github.com/100suping/sql-helper.git
 cd sql-helper/frontend
 pip install -r requirements.txt
 streamlit run app.py
