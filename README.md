@@ -81,8 +81,8 @@ nvidia-smi
 ```
 
 6. Setup backend application:
-```
-bashCopypyenv activate backend
+```bash
+pyenv activate backend
 git clone -b refactor https://github.com/100suping/sql-helper.git
 cd sql-helper/backend
 chmod +x backend_env_setup.sh
