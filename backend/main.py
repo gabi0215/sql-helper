@@ -24,6 +24,7 @@ class LLMWorkflowInput(BaseModel):
 
 @app.post("/llm_workflow")
 def llm_workflow(workflow_input: LLMWorkflowInput):
+    global workflow
     processed_input = workflow_input.model_dump()
 
     config = get_runnable_config(30, processed_input["thread_id"])
@@ -52,6 +53,7 @@ def llm_workflow(workflow_input: LLMWorkflowInput):
         )
     else:  # 초기 질문인 경우
         # TODO
+        workflow = make_graph()
         # 첫 번째 초기질문은 잘 작동하나 두번째 초기질문에서 GraphState가 초기화되지 않는 문제 발생
         outputs = workflow.invoke(
             input=inputs,
