@@ -5,7 +5,7 @@ An AI system that provides:
 - SQL → Natural Language: Explain query results in plain language
 - Interactive Refinement: Multi-turn conversation to improve query accuracy
 
-## Core Components
+### Core Components
 - Frontend: Streamlit web interface
 - Backend: LangGraph query generation
 - RAG: Database schema-aware system using FAISS vector store
@@ -14,7 +14,7 @@ An AI system that provides:
   - Enables context-aware query refinement
 - Database: MySQL integration
 
-## System Architecture
+### System Architecture
 - Backend Server (GPU)
   - NVIDIA L4 GPU minimum
   - VRAM: 23GB+ (Tested: 23034MiB)
@@ -27,7 +27,7 @@ An AI system that provides:
   - Memory: 8GB+ recommended
   - Purpose: Web interface & user interactions
 
-## Required Open Ports
+### Required Open Ports
 - Port 8501: Streamlit web interface access
 - Port 8000: Backend FastAPI server access 
 - Port 3306: MySQL database connection
@@ -53,7 +53,9 @@ chmod +x frontend_env_setup.sh
 pyenv activate frontend
 ```
 
-3. Start application:
+## Frontend Application run
+
+0. Start application:
 ```   
 cd sql-helper/frontend
 pip install -r requirements.txt
@@ -61,7 +63,7 @@ streamlit run app.py
 ```
 
 ## Backend Setup Guide
-## GPU Server Initial Setup
+### GPU Server Initial Setup
 
 1. Install CUDA and NVIDIA drivers:
 ```bash
@@ -97,7 +99,7 @@ nvidia-smi
 # Should show NVIDIA L4 GPU info
 ```
 
-## Backend Application Setup
+### Backend Application Setup
 1. Setup backend application:
 ```bash
 cd sql-helper/backend
