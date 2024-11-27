@@ -113,7 +113,7 @@ def clarify_user_question(
     user_question: str, user_question_analyze: str, collected_questions: List[str]
 ) -> str:
     output_parser = StrOutputParser()
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -147,7 +147,7 @@ def clarify_user_question(
 
 
 def check_leading_question(leading_question: str) -> int:
-    if leading_question.startswith("종료"):
+    if leading_question.startswith("종료") or leading_question.startswith('"종료'):
         return 0
     else:
         return 1
@@ -225,7 +225,7 @@ def extract_context(
         # 평가할 context가 없다면 빈 리스트 반환
         return []
 
-    system_instruction = load_prompt("prompts/table_selection/main_v1.prompt")
+    system_instruction = load_prompt("prompts/table_selection/main_v2.prompt")
 
     if flow_status == "RESELECT":
         print("검색된 테이블 스키마 재검수")
@@ -441,7 +441,7 @@ def business_conversation(user_question, sql_query, query_result) -> str:
             ),
         ]
     )
-    llm = ChatOpenAI(model="gpt-4o-mini")
+    llm = ChatOpenAI(model="gpt-4o-mini",)
     chain = prompt | llm | output_parser
 
     output = chain.invoke({"user_question": user_question})
