@@ -1,14 +1,20 @@
-# 📝 SQL Helper: Natural Language to SQL Conversion
+# 📝 SQL Helper: Natural Language ↔ SQL Interactive System
 
-An AI system that converts natural language to SQL queries using LangGraph and Streamlit. Built with Qwen model for intuitive database interactions.
+An AI system that provides:
+- Natural Language → SQL: Convert user questions to SQL queries
+- SQL → Natural Language: Explain query results in plain language
+- Interactive Refinement: Multi-turn conversation to improve query accuracy
 
 ## Core Components
 - Frontend: Streamlit web interface
 - Backend: LangGraph query generation
-- RAG: Context-aware response system
+- RAG: Database schema-aware system using FAISS vector store
+  - Indexes table structures and relationships
+  - Uses metadata for precise SQL generation
+  - Enables context-aware query refinement
 - Database: MySQL integration
 
-### System Architecture
+## System Architecture
 - Backend Server (GPU)
   - NVIDIA L4 GPU minimum
   - VRAM: 23GB+ (Tested: 23034MiB)
@@ -21,13 +27,13 @@ An AI system that converts natural language to SQL queries using LangGraph and S
   - Memory: 8GB+ recommended
   - Purpose: Web interface & user interactions
 
-### Required Open Ports
+## Required Open Ports
 - Port 8501: Streamlit web interface access
 - Port 8000: Backend FastAPI server access 
 - Port 3306: MySQL database connection
 
 
-## Installation and Setup
+### Installation and Setup
 ## Frontend Setup Guide
 
 1. Run environment setup script:
