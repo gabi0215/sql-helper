@@ -10,40 +10,91 @@ An AI system that converts natural language to SQL queries using LangGraph and S
 
 ### System Architecture
 - Backend Server (GPU)
- - NVIDIA L4 GPU minimum
- - VRAM: 23GB+ (Tested: 23034MiB)
- - CUDA Version: 12.2
- - Driver Version: 535.183.01+
- - Purpose: LLM processing & SQL generation
+  - NVIDIA L4 GPU minimum
+  - VRAM: 23GB+ (Tested: 23034MiB)
+  - CUDA Version: 12.2
+  - Driver Version: 535.183.01+
+  - Purpose: LLM processing & SQL generation
 
 - Frontend Server (CPU)
- - Standard CPU instance
- - Memory: 8GB+ recommended
- - Purpose: Web interface & user interactions
+  - Standard CPU instance
+  - Memory: 8GB+ recommended
+  - Purpose: Web interface & user interactions
 
 ### Required Open Ports
 - Port 8501: Streamlit web interface access
 - Port 8000: Backend FastAPI server access 
 - Port 3306: MySQL database connection
 
+
 ## Installation and Setup
-1. Clone and Setup:
-```
-git clone <repository-url>
-cd sql-helper
+## Frontend Setup Guide
+
+1. Run environment setup script:
+```bash
 chmod +x frontend_env_setup.sh
-./frontend_env_setup.sh
-```
-2. Environment Setup Script (frontend_env_setup.sh):
-```
-#!/bin/bash
+./frontend_env_setup.sh```
 
+2. Open new terminal and activate environment:
+```
+bashCopypyenv activate frontend
+```
+3. Clone and start application:
+```
+bashCopygit clone -b refactor https://github.com/100suping/sql-helper.git
+cd sql-helper/frontend
 pip install -r requirements.txt
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-pip install --upgrade pip && pip install unsloth && echo "Backend setup complete!"
+streamlit run app.py
 ```
 
-3. Configure Environment Variables:
+## Backend Setup Guide
+## GPU Server Initial Setup
+
+1. Install CUDA and NVIDIA drivers:
+```bash
+chmod +x cuda_install.sh
+./cuda_install.sh
+# System will reboot
+```
+2. After reboot, install PyEnv dependencies:
+```bash
+chmod +x pyenv_dependencies.sh
+./pyenv_dependencies.sh
+```
+3. Setup PyEnv:
+```bash
+Copychmod +x pyenv_setup.sh
+./pyenv_setup.sh
+```
+
+4.Create Python environment:
+```bash
+chmod +x pyenv_virtualenv.sh
+./pyenv_virtualenv.sh
+# Enter Python version: 3.11.8
+# Enter environment name: backend
+```
+5. Verify GPU setup:
+```bash
+nvidia-smi
+# Should show NVIDIA L4 GPU info
+```
+
+6. Setup backend application:
+```
+bashCopypyenv activate backend
+git clone -b refactor https://github.com/100suping/sql-helper.git
+cd sql-helper/backend
+chmod +x backend_env_setup.sh
+./backend_env_setup.sh
+python main.py
+
+```
+Note: Server requires reboot after CUDA installation. Ensure all commands are executed in order.
+
+
+
+## Configure Environment Variables:
 Create .env file:
 
 ```
