@@ -8,32 +8,23 @@ An AI system that converts natural language to SQL queries using LangGraph and S
 - RAG: Context-aware response system
 - Database: MySQL integration
 
-## System Requirements
+### System Architecture
+- Backend Server (GPU)
+ - NVIDIA L4 GPU minimum
+ - VRAM: 23GB+ (Tested: 23034MiB)
+ - CUDA Version: 12.2
+ - Driver Version: 535.183.01+
+ - Purpose: LLM processing & SQL generation
 
-### Hardware (Mandatory)
-- NVIDIA GPU
-  - Minimum: NVIDIA L4
-  - VRAM: 23GB+ (Tested: 23034MiB)
-  - CUDA Version: 12.2
-  - Driver Version: 535.183.01+
+- Frontend Server (CPU)
+ - Standard CPU instance
+ - Memory: 8GB+ recommended
+ - Purpose: Web interface & user interactions
 
-### Software
-- Python 3.8+
-- MySQL Database
-- CUDA Toolkit 12.2
-
-## Key Dependencies
-```
-faiss-cpu         1.9.0
-fastapi           0.115.5
-langchain-community 0.3.2
-langgraph         0.2.37
-PyMySQL           1.1.1
-torchaudio        2.5.1+cu121
-torchvision       0.20.1+cu121
-unsloth           2024.11.11
-uvicorn           0.32.1
-```
+### Required Open Ports
+- Port 8501: Streamlit web interface access
+- Port 8000: Backend FastAPI server access 
+- Port 3306: MySQL database connection
 
 ## Installation and Setup
 1. Clone and Setup:
