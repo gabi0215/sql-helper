@@ -33,7 +33,8 @@ An AI system that converts natural language to SQL queries using LangGraph and S
 1. Run environment setup script:
 ```bash
 chmod +x frontend_env_setup.sh
-./frontend_env_setup.sh```
+./frontend_env_setup.sh
+```
 
 2. Open new terminal and activate environment:
 ```bash
