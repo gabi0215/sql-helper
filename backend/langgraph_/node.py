@@ -147,7 +147,7 @@ def table_selection(state: GraphState) -> GraphState:
     Returns:
         GraphState: 검색된 context들과 검수를 통과한 context의 index list가 추가된 그래프 상태
     """
-    user_qusetion = state["user_question"]
+    user_question = state["user_question"]
     context_cnt = state["context_cnt"]
     flow_status = state.get("flow_status", "KEEP")
     sample_info = state["sample_info"]
@@ -157,7 +157,7 @@ def table_selection(state: GraphState) -> GraphState:
     # vector_store = state["vector_store_dict"]["table_info"] # table_ddl
     # 사용자 질문과 관련성이 있는 테이블+컬럼정보를 검색
     table_contexts = select_relevant_tables(
-        user_question=user_qusetion, context_cnt=context_cnt, vector_store=vector_store
+        user_question=user_question, context_cnt=context_cnt, vector_store=vector_store
     )
     # 검색된 context를 검수
     if flow_status == "RESELECT":
@@ -165,7 +165,7 @@ def table_selection(state: GraphState) -> GraphState:
         prev_query = state["sql_query"]
         error_msg = state["error_msg"]
         table_contexts_ids = extract_context(
-            user_question=user_qusetion,
+            user_question=user_question,
             table_contexts=table_contexts,
             flow_status=flow_status,
             prev_list=prev_list,
@@ -174,7 +174,7 @@ def table_selection(state: GraphState) -> GraphState:
         )
     else:
         table_contexts_ids = extract_context(
-            user_question=user_qusetion, table_contexts=table_contexts
+            user_question=user_question, table_contexts=table_contexts
         )
     return GraphState(
         table_contexts=table_contexts,
@@ -184,7 +184,7 @@ def table_selection(state: GraphState) -> GraphState:
 
 
 def query_creation(state: GraphState) -> GraphState:
-    user_qusetion = state["user_question"]
+    user_question = state["user_question"]
     table_contexts = state["table_contexts"]
     table_contexts_ids = state["table_contexts_ids"]
 
@@ -196,7 +196,7 @@ def query_creation(state: GraphState) -> GraphState:
         error_msg = state["error_msg"]
         print("Do Query Fix!!!")
         sql_query = create_query(
-            user_qusetion,
+            user_question,
             table_contexts,
             table_contexts_ids,
             flow_status=flow_status,
@@ -205,7 +205,7 @@ def query_creation(state: GraphState) -> GraphState:
         )
 
     else:
-        sql_query = create_query(user_qusetion, table_contexts, table_contexts_ids)
+        sql_query = create_query(user_question, table_contexts, table_contexts_ids)
 
     return GraphState(
         sql_query=sql_query,
