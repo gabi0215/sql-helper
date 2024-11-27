@@ -13,14 +13,6 @@ Import database:
 mysql -u your_user -p your_database < dump.sql
 ```
 
-## LLM Models Used
-### Main Model
-- [100suping/Qwen2.5-Coder-34B-Instruct-kosql-adapter](https://huggingface.co/100suping/Qwen2.5-Coder-34B-Instruct-kosql-adapter)
- - Fine-tuned for SQL generation and natural language interaction
- - Optimized for Korean language support
- - Access requires Hugging Face token
-   
-
 ### Core Components
 - Frontend: Streamlit web interface
 - Backend: LangGraph query generation
@@ -184,4 +176,25 @@ Note: `.env` file should be placed in project root and backend directory needs a
 
 ```
 
+## LLM Models Used
+### Main Model
+- [100suping/Qwen2.5-Coder-34B-Instruct-kosql-adapter](https://huggingface.co/100suping/Qwen2.5-Coder-34B-Instruct-kosql-adapter)
+ - Fine-tuned for SQL generation and natural language interaction
+ - Optimized for Korean language support
+ - Access requires Hugging Face token
 
+## Dataset
+We provide fine-tuning dataset at [Sessac101/sql-helper-tone-QA](https://huggingface.co/datasets/Sessac101/sql-helper-tone-QA/tree/main):
+
+- Modified BIRD dataset with Korean translations
+ - Cleaned and merged schema
+ - Added Korean Q&A pairs
+ - Available files:
+   - `merged_cleaned.json`: Cleaned dataset
+   - `merged_cleaned_addschema.json`: Dataset with schema
+   - `모범 QA - 시트1.csv`: 50 curated Q&A pairs
+
+Dataset can be used for:
+- Model fine-tuning
+- Testing system accuracy
+- Example queries showcase   
