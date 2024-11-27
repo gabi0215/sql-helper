@@ -33,7 +33,7 @@ An AI system that provides:
 - Port 3306: MySQL database connection
 
 
-### Installation and Setup
+# Installation and Setup
 ## Frontend Setup Guide
 
 1. Run environment setup script:
