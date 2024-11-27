@@ -441,7 +441,9 @@ def business_conversation(user_question, sql_query, query_result) -> str:
             ),
         ]
     )
-    llm = ChatOpenAI(model="gpt-4o-mini",)
+    llm = ChatOpenAI(
+        model="gpt-4o-mini",
+    )
     chain = prompt | llm | output_parser
 
     output = chain.invoke({"user_question": user_question})
