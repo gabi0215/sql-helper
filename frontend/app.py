@@ -1,8 +1,12 @@
 import streamlit as st
 import requests
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 # API 엔드포인트 설정
-API_URL = "http://localhost:8000/llm_workflow"
+API_URL = f"http://{os.getenv('BACKEND_HOST')}:8000/llm_workflow"
 
 
 # 세션 상태 초기화
