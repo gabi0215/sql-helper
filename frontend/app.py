@@ -56,7 +56,7 @@ def main():
             if response.status_code == 200:
                 processed_info = response.json()
                 st.session_state.snapshot_values = processed_info
-                ask_user = processed_info["ask_user"]
+                ask_user = processed_info.get("ask_user", 0)
                 st.session_state.initial_question = 0
 
                 # 응답 결정
