@@ -145,7 +145,7 @@ sql-helper/
 │   ├── requirements.txt      # Frontend dependencies
 │   ├── README.md            # Frontend docs
 │   └── frontend_env_setup.sh # Frontend setup script
-│   └── .env      # Frontend variables for backend
+│   └── .env      # Frontend variables for front
 ├── backend/
 │   ├── GPUsetting/          # GPU/CUDA setup scripts
 │   │   ├── cuda_install.sh
