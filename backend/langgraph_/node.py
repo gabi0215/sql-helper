@@ -41,10 +41,6 @@ class GraphState(TypedDict):
     query_fix_cnt: int
     query_result: List[Any]
     error_msg: str
-    # TODO
-    # 지금은 FAISS 벡터 DB를 쓰기에 아래와 같이 딕셔너리에 넣어놓지만, Redis DB 서버를 만들어서 이용할 경우에는 index가 들어가야 한다.
-    # FAISS 객체는 serializable 하지 않아 Graph State에 넣어 놓을 수 없다. 노드 안에서 객체를 불러오는 것으로 한다.
-    # vector_store_dict: Dict[str, VectorStore | FAISS]  # RAG를 위한 벡터 DB
 
 
 ########################### 정의된 노드 ###########################

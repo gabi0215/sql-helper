@@ -20,9 +20,14 @@ from .utils import EmptyQueryResultError, NullQueryResultError, load_prompt
 from typing import List, Any, Union, Sequence, Dict
 from pydantic import BaseModel, Field
 import os, re
-
-from unsloth import FastLanguageModel
 import torch
+
+home_path = os.path.expanduser("~")
+cache_dir = os.path.join(home_path, "sql-helper/.cache/unsloth")
+
+if not os.path.exists(cache_dir):
+    global model, tokenizer
+    model, tokenizer = load_qwen_model()
 
 
 def evaluate_user_question(user_question: str) -> str:
@@ -138,10 +143,6 @@ def clarify_user_question(
             "collected_questions": chat_history,
         }
     )
-
-    # user_add_questions.append(
-    #     f"\n질문: \n{clarify_question}\n답변: {user_answer}\n"
-    # )
 
     return leading_question
 
@@ -295,10 +296,6 @@ def create_query(
             full_prompt = (
                 prefix + regen_prompt + postfix + f"\n\nuser_question: {user_question}"
             )
-
-        # Qwen 모델 로드 및 추론 준비
-        model, tokenizer = load_qwen_model()
-        model = FastLanguageModel.for_inference(model)  # 추론을 위한 모델 준비
 
         # 입력 토크나이징
         inputs = tokenizer(

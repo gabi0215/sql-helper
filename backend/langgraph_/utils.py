@@ -69,6 +69,7 @@ def str2bool(v):
 
 
 def load_qwen_model():
+    global model, tokenizer
     # Hugging Face 토큰 설정
     load_dotenv()
 
@@ -82,9 +83,16 @@ def load_qwen_model():
     # 8비트 양자화 설정
     bnb_config = BitsAndBytesConfig(load_in_8bit=True)
 
+    home_path = os.path.expanduser("~")
+    cache_dir = os.path.join(home_path, "sql-helper/.cache/unsloth")
+
     # FastLanguageModel을 사용하여 모델과 토크나이저 로드
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=model_name, token=huggingface_token, quantization_config=bnb_config
+        model_name=model_name,
+        token=huggingface_token,
+        quantization_config=bnb_config,
+        cache_dir=cache_dir,
+        device_map="auto",
     )
 
     # Unsloth 사용 시 inference 모드 전환

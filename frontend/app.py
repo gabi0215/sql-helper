@@ -1,8 +1,12 @@
 import streamlit as st
 import requests
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 # API 엔드포인트 설정
-API_URL = "http://localhost:8000/llm_workflow"
+API_URL = f"http://{os.getenv('BACKEND_HOST')}:8000/llm_workflow"
 
 
 # 세션 상태 초기화
@@ -56,7 +60,7 @@ def main():
             if response.status_code == 200:
                 processed_info = response.json()
                 st.session_state.snapshot_values = processed_info
-                ask_user = processed_info["ask_user"]
+                ask_user = processed_info.get("ask_user", 0)
                 st.session_state.initial_question = 0
 
                 # 응답 결정
