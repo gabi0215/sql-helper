@@ -13,7 +13,8 @@ API_URL = f"http://{os.getenv('BACKEND_HOST')}:8000/llm_workflow"
 
 st.set_page_config(page_title="SQL Query Generator", page_icon="🔒", layout="wide")
 
-st.markdown("""
+st.markdown(
+    """
 <style>
     /* Base */
     .main { padding: 2rem; max-width: 800px; margin: 0 auto; }
@@ -96,7 +97,10 @@ st.markdown("""
         .auth-container { padding: 1rem; }
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
+
 
 def initialize_session_state():
     if "conversation_history" not in st.session_state:
@@ -114,6 +118,7 @@ def initialize_session_state():
     if "session_count" not in st.session_state:
         st.session_state.session_count = 1
 
+
 def reset_session():
     st.session_state.conversation_history = []
     st.session_state.thread_id = str(st.session_state.session_count + 1)
@@ -121,39 +126,46 @@ def reset_session():
     st.session_state.snapshot_values = None
     st.session_state.session_count += 1
 
+
 def authenticate_user(username, password):
     try:
         conn = mysql.connector.connect(
             host=os.getenv("DB_HOST"),
             user=os.getenv("DB_USER"),
             password=os.getenv("DB_PASSWORD"),
-            database=os.getenv("DB_NAME")
+            database=os.getenv("DB_NAME"),
         )
         cursor = conn.cursor(dictionary=True)
         cursor.execute("SELECT * FROM connect_user WHERE username = %s", (username,))
         user = cursor.fetchone()
-        if user and bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
+        if user and bcrypt.checkpw(
+            password.encode("utf-8"), user["password"].encode("utf-8")
+        ):
             return user
         return None
     except Error as e:
         st.error(f"데이터베이스 오류: {e}")
         return None
     finally:
-        if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals(): conn.close()
+        if "cursor" in locals():
+            cursor.close()
+        if "conn" in locals():
+            conn.close()
+
 
 def check_department_access(department, question):
     department_keywords = {
-        'accounting': ['환불', '거래', '장부', '비용', '회계', 'ACC', 'acc'],
-        'cs': ['만족도', '처리', '요청', '고객서비스', 'CS', 'cs'],
-        'common': ['상품', '주문', '고객', 'common']
+        "accounting": ["환불", "거래", "장부", "비용", "회계", "ACC", "acc"],
+        "cs": ["만족도", "처리", "요청", "고객서비스", "CS", "cs"],
+        "common": ["상품", "주문", "고객", "common"],
     }
     question_lower = question.lower()
     for dept, keywords in department_keywords.items():
         if any(keyword in question_lower for keyword in keywords):
-            if dept != department and department != 'common':
+            if dept != department and department != "common":
                 return False
     return True
+
 
 def register_user(username, password, department, role):
     try:
@@ -161,13 +173,13 @@ def register_user(username, password, department, role):
             host=os.getenv("DB_HOST"),
             user=os.getenv("DB_USER"),
             password=os.getenv("DB_PASSWORD"),
-            database=os.getenv("DB_NAME")
+            database=os.getenv("DB_NAME"),
         )
         cursor = conn.cursor()
-        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
         cursor.execute(
             "INSERT INTO connect_user (username, password, department, role) VALUES (%s, %s, %s, %s)",
-            (username, hashed, department, role)
+            (username, hashed, department, role),
         )
         conn.commit()
         return True
@@ -175,19 +187,25 @@ def register_user(username, password, department, role):
         st.error(f"등록 오류: {e}")
         return False
     finally:
-        if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals(): conn.close()
+        if "cursor" in locals():
+            cursor.close()
+        if "conn" in locals():
+            conn.close()
 
 
 def process_chat(prompt):
     st.chat_message("user").write(prompt)
     st.session_state.conversation_history.append({"role": "user", "content": prompt})
 
-    if not check_department_access(st.session_state.user['department'], prompt):
-        error_message = "접근 권한이 없습니다. 해당 부서 관련 데이터만 조회할 수 있습니다."
+    if not check_department_access(st.session_state.user["department"], prompt):
+        error_message = (
+            "접근 권한이 없습니다. 해당 부서 관련 데이터만 조회할 수 있습니다."
+        )
         st.error(error_message)
         st.chat_message("assistant").write(error_message)
-        st.session_state.conversation_history.append({"role": "assistant", "content": error_message})
+        st.session_state.conversation_history.append(
+            {"role": "assistant", "content": error_message}
+        )
         return
 
     try:
@@ -198,7 +216,7 @@ def process_chat(prompt):
                 "initial_question": st.session_state.initial_question,
                 "thread_id": st.session_state.thread_id,
                 "last_snapshot_values": st.session_state.snapshot_values,
-            }
+            },
         )
 
         if response.status_code == 200:
@@ -207,34 +225,47 @@ def process_chat(prompt):
             ask_user = processed_info.get("ask_user", 0)
             st.session_state.initial_question = 0
 
-            output = processed_info["final_answer"] if ask_user == 0 else processed_info["collected_questions"][-1]
+            output = (
+                processed_info["final_answer"]
+                if ask_user == 0
+                else processed_info["collected_questions"][-1]
+            )
             st.session_state.initial_question = 1 if ask_user == 0 else 0
 
             st.chat_message("assistant").write(output)
-            st.session_state.conversation_history.append({"role": "assistant", "content": output})
+            st.session_state.conversation_history.append(
+                {"role": "assistant", "content": output}
+            )
         else:
             error_message = "서버 처리 중 오류가 발생했습니다."
             st.error(error_message)
             st.chat_message("assistant").write(error_message)
-            st.session_state.conversation_history.append({"role": "assistant", "content": error_message})
+            st.session_state.conversation_history.append(
+                {"role": "assistant", "content": error_message}
+            )
     except requests.exceptions.RequestException as e:
         error_message = f"서버 연결 오류: {str(e)}"
         st.error(error_message)
         st.chat_message("assistant").write(error_message)
-        st.session_state.conversation_history.append({"role": "assistant", "content": error_message})
+        st.session_state.conversation_history.append(
+            {"role": "assistant", "content": error_message}
+        )
+
 
 def main():
     initialize_session_state()
-    
+
     st.markdown('<p class="big-font">AI SQL 쿼리 생성기</p>', unsafe_allow_html=True)
-    st.write("이 시스템은 사용자 질문을 분석하여 SQL 쿼리로 변환하고, 그 결과를 자연어로 제공합니다.")
+    st.write(
+        "이 시스템은 사용자 질문을 분석하여 SQL 쿼리로 변환하고, 그 결과를 자연어로 제공합니다."
+    )
     st.markdown("* 자연어 질문 분석 및 SQL 쿼리 생성")
     st.markdown("* 쿼리 실행 및 결과 제공")
     st.markdown("* 사용자 권한 기반 데이터 접근 제어")
-    
+
     if not st.session_state.user:
         tab1, tab2 = st.tabs(["로그인", "회원가입"])
-        
+
         with tab1:
             st.markdown('<div class="auth-container">', unsafe_allow_html=True)
             st.subheader("로그인")
@@ -246,31 +277,34 @@ def main():
                     st.rerun()
                 else:
                     st.error("로그인 실패")
-            st.markdown('</div>', unsafe_allow_html=True)
-        
+            st.markdown("</div>", unsafe_allow_html=True)
+
         with tab2:
             st.markdown('<div class="auth-container">', unsafe_allow_html=True)
             st.subheader("회원가입")
             new_username = st.text_input("사용자명", key="reg_user")
             new_password = st.text_input("비밀번호", type="password", key="reg_pass")
-            department = st.selectbox("부서", ['accounting', 'cs', 'common'])
-            role = st.selectbox("역할", ['User', 'Admin'])
+            department = st.selectbox("부서", ["accounting", "cs", "common"])
+            role = st.selectbox("역할", ["User", "Admin"])
             if st.button("회원가입", use_container_width=True):
                 if register_user(new_username, new_password, department, role):
                     st.success("회원가입이 완료되었습니다")
                 else:
                     st.error("회원가입 실패")
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
     else:
         # 사이드바에 사용자 정보와 컨트롤
-        st.sidebar.markdown(f"""
+        st.sidebar.markdown(
+            f"""
             <div style='background: white; padding: 1rem; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);'>
                 <h3 style='margin: 0; color: #1e293b;'>👤 {st.session_state.user['username']}</h3>
                 <p style='margin: 0.5rem 0; color: #64748b;'>부서: {st.session_state.user['department']}</p>
                 <p style='margin: 0; color: #64748b;'>세션 ID: {st.session_state.thread_id}</p>
             </div>
-        """, unsafe_allow_html=True)
-        
+        """,
+            unsafe_allow_html=True,
+        )
+
         col1, col2 = st.sidebar.columns(2)
         with col1:
             if st.button("새 세션", use_container_width=True):
@@ -285,7 +319,7 @@ def main():
         st.markdown('<div class="chat-container">', unsafe_allow_html=True)
         for message in st.session_state.conversation_history:
             st.chat_message(message["role"]).write(message["content"])
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         if prompt := st.chat_input("데이터에 대해 질문하세요"):
             process_chat(prompt)
@@ -293,6 +327,7 @@ def main():
         if st.session_state.loading:
             with st.spinner("응답을 기다리는 중입니다..."):
                 time.sleep(1)
+
 
 if __name__ == "__main__":
     main()
