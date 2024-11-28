@@ -33,7 +33,7 @@ def llm_workflow(workflow_input: LLMWorkflowInput):
         "context_cnt": 10,
         "max_query_fix": 2,
         "query_fix_cnt": -1,
-        "sample_info": 3,
+        "sample_info": 5,
     }
     # 초기 질문이 아닌 경우
     if processed_input["initial_question"] == 0:
