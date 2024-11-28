@@ -94,9 +94,6 @@ chmod +x backend_env_setup.sh
 Create .env file in project root:
 ```
 OPENAI_API_KEY="your-api-key"
-LANGCHAIN_API_KEY="your-api-key"
-LANGCHAIN_TRACING_V2=false
-LANGCHAIN_PROJECT="your-project-name"
 URL="your-mysql-database-url"
 HUGGINGFACE_TOKEN='your-huggingface-token"
 ```
@@ -125,6 +122,12 @@ chmod +x frontend_env_setup.sh
 pyenv activate frontend
 ```
 
+3. Configure environment variables:
+Create .env file in project fronted folder:
+```
+BACKEND_HOST="your backend server ip"
+```
+
 ## Frontend Application run
 
 0. Start application:
@@ -142,6 +145,7 @@ sql-helper/
 │   ├── requirements.txt      # Frontend dependencies
 │   ├── README.md            # Frontend docs
 │   └── frontend_env_setup.sh # Frontend setup script
+│   └── .env      # Frontend variables for backend
 ├── backend/
 │   ├── GPUsetting/          # GPU/CUDA setup scripts
 │   │   ├── cuda_install.sh
@@ -168,7 +172,7 @@ sql-helper/
 │   ├── main.py             # Backend entry point
 │   ├── README.md           # Backend docs
 │   └── requirements.txt    # Backend dependencies
-├── .env                    # Environment variables for backend
+│   └── .env      # Environment variables for backend
 ├── README.md              # Project documentation
 └── .gitignore
 
