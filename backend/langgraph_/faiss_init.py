@@ -106,10 +106,7 @@ def get_table_ddl(db_name: str | None, DB_SERVER) -> Tuple[List[str], List[str]]
     # DB 내 모든 테이블 이름 가져오기
     all_tables = set(inspector.get_table_names() + inspector.get_view_names())
     print("Table inspection Completed!")
-
-    # TODO
-    # 이 단계에서 사용자에 따라 접근 가능한 테이블을 반영은 할 수 있다.
-    # 다만, 이 함수가 chat model의 tool로서 쓰이지 않는다면 굳이 반영을 안해도 된다.
+    # 메타데이터를 가져올 테이블 설정
     to_reflect = set(all_tables)
     print(f"Tables to get DDL: {to_reflect}")
     # 테이블의 메타데이터(컬럼 정보 등)를 저장하기 위한 객체 생성

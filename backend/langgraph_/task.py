@@ -139,10 +139,6 @@ def clarify_user_question(
         }
     )
 
-    # user_add_questions.append(
-    #     f"\n질문: \n{clarify_question}\n답변: {user_answer}\n"
-    # )
-
     return leading_question
 
 
