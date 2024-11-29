@@ -209,3 +209,6 @@ Note: `.env` file should be placed in project root and backend directory needs a
  - Based on Spider dataset
 
 Both datasets were used for fine-tuning our model for improved Korean SQL generation.
+
+## Demo
+![demo](https://github.com/user-attachments/assets/5d74f962-fcc3-4f88-b151-f6128c8b5ae9)
