@@ -125,6 +125,10 @@ pyenv activate frontend
 3. Configure environment variables:
 Create .env file in project fronted folder:
 ```
+DB_HOST="your mysql DB server ip"
+DB_USER="your root account"
+DB_PASSWORD="your root account's password"
+DB_NAME=user_db
 BACKEND_HOST="your backend server ip"
 ```
 
@@ -134,14 +138,15 @@ BACKEND_HOST="your backend server ip"
 ```   
 cd sql-helper/frontend
 pip install -r requirements.txt
-streamlit run app.py
+streamlit run app2.py
 ```
 
 ## Project Structure
 ```
 sql-helper/
 ├── frontend/
-│   ├── app.py                # Streamlit interface
+│   ├── app.py                # Streamlit interface (legacy)
+│   ├── app2.py               # Streamlit interface
 │   ├── requirements.txt      # Frontend dependencies
 │   ├── README.md            # Frontend docs
 │   └── frontend_env_setup.sh # Frontend setup script
