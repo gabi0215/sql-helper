@@ -5,6 +5,10 @@ An AI system that provides:
 - SQL → Natural Language: Explain query results in plain language
 - Interactive Refinement: Multi-turn conversation to improve query accuracy
 
+
+## Demo
+![demo](https://github.com/user-attachments/assets/5d74f962-fcc3-4f88-b151-f6128c8b5ae9)
+
 ## Required Files
 ### Database Dump
 Download the MySQL dump file from [Release v1.0](https://github.com/100suping/sql-helper/releases/tag/mysql-dump)
@@ -209,6 +213,3 @@ Note: `.env` file should be placed in project root and backend directory needs a
  - Based on Spider dataset
 
 Both datasets were used for fine-tuning our model for improved Korean SQL generation.
-
-## Demo
-![demo](https://github.com/user-attachments/assets/5d74f962-fcc3-4f88-b151-f6128c8b5ae9)
