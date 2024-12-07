@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import uvicorn
 
 from langgraph_.graph import make_graph, multiturn_test, make_graph_for_test
-from langgraph_.utils import get_runnable_config
+from langgraph_.utils import get_runnable_config, extract_context_tables
 from dotenv import load_dotenv
 
 app = FastAPI()
@@ -60,7 +60,14 @@ def llm_workflow(workflow_input: LLMWorkflowInput):
             config=config,
             interrupt_before=["human_feedback"],
         )
-    print(outputs)
+    # print(outputs)
+    if "final_answer" in outputs and outputs["user_question_eval"]:
+        print(
+            "RAG과정에서 사용된 context table:",
+            extract_context_tables(
+                outputs["table_contexts"], outputs["table_contexts_ids"]
+            ),
+        )
     return outputs
 
 
