@@ -22,6 +22,7 @@ from .faiss_init import get_vector_stores
 class GraphState(TypedDict):
     # Warning!
     # 그래프 내에서 사용될 모든 key값을 정의해야 오류가 나지 않는다.
+    llm_api: str  # Local, ChatGPT-4o
     user_question: str  # 사용자의 질문
     user_question_eval: str  # 사용자의 질문이 SQL 관련 질문인지 여부
     user_question_analyze: str  # 사용자 질문 분석
@@ -183,6 +184,7 @@ def query_creation(state: GraphState) -> GraphState:
     user_question = state["user_question"]
     table_contexts = state["table_contexts"]
     table_contexts_ids = state["table_contexts_ids"]
+    llm_api = state["llm_api"]
 
     query_fix_cnt = state.get("query_fix_cnt")
     flow_status = state.get("flow_status", "KEEP")
@@ -195,13 +197,16 @@ def query_creation(state: GraphState) -> GraphState:
             user_question,
             table_contexts,
             table_contexts_ids,
+            llm_api,
             flow_status=flow_status,
             prev_query=prev_query,
             error_msg=error_msg,
         )
 
     else:
-        sql_query = create_query(user_question, table_contexts, table_contexts_ids)
+        sql_query = create_query(
+            user_question, table_contexts, table_contexts_ids, llm_api
+        )
 
     return GraphState(
         sql_query=sql_query,

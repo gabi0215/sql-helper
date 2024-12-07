@@ -18,13 +18,13 @@ class LLMWorkflowInput(BaseModel):
     initial_question: int
     thread_id: str
     last_snapshot_values: dict | None
+    llm_api: str
 
 
 @app.post("/llm_workflow")
 def llm_workflow(workflow_input: LLMWorkflowInput):
     global workflow
     processed_input = workflow_input.model_dump()
-
     config = get_runnable_config(30, processed_input["thread_id"])
     inputs = {
         "user_question": processed_input["user_question"],
@@ -32,6 +32,7 @@ def llm_workflow(workflow_input: LLMWorkflowInput):
         "max_query_fix": 2,
         "query_fix_cnt": -1,
         "sample_info": 5,
+        "llm_api": processed_input["llm_api"],
     }
     # 초기 질문이 아닌 경우
     if processed_input["initial_question"] == 0:
@@ -39,6 +40,7 @@ def llm_workflow(workflow_input: LLMWorkflowInput):
         values["collected_questions"][
             -1
         ] += f"\n답변: {processed_input['user_question']}"
+        values["llm_api"] = processed_input["llm_api"]
         workflow.update_state(
             config,
             values,

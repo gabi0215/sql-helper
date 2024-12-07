@@ -25,6 +25,7 @@ import torch
 
 if torch.cuda.is_available():
     model, tokenizer = load_qwen_model()
+    print("Local Model is ready!")
 else:
     print("Non-GPU env has detected.")
 
@@ -265,6 +266,7 @@ def create_query(
     user_question,
     table_contexts,
     table_contexts_ids,
+    llm_api,
     flow_status="KEEP",
     prev_query="",
     error_msg="",
@@ -292,7 +294,8 @@ def create_query(
             ).format(prev_query=prev_query, result_msg=error_msg)
             system_prompt = prefix + regen_prompt + postfix
 
-        if torch.cuda.is_available():
+        # GPU를 사용 가능하며, 사용자가 로컬 LLM 사용을 원할 경우
+        if torch.cuda.is_available() and llm_api == "Local":
             full_prompt = system_prompt + f"\n\nuser_question: {user_question}"
             # 입력 토크나이징
             inputs = tokenizer(

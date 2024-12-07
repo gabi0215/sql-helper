@@ -193,7 +193,7 @@ def register_user(username, password, department, role):
             conn.close()
 
 
-def process_chat(prompt):
+def process_chat(prompt, llm_api):
     st.chat_message("user").write(prompt)
     st.session_state.conversation_history.append({"role": "user", "content": prompt})
 
@@ -216,6 +216,7 @@ def process_chat(prompt):
                 "initial_question": st.session_state.initial_question,
                 "thread_id": st.session_state.thread_id,
                 "last_snapshot_values": st.session_state.snapshot_values,
+                "llm_api": llm_api,
             },
         )
 
@@ -316,13 +317,23 @@ def main():
                     del st.session_state[key]
                 st.rerun()
 
+        with st.sidebar:
+            llm_api = st.radio(
+                "Which LLM would like you use?",
+                ["Local", "ChatGPT-4o"],
+                captions=[
+                    "unsloth/qwen2.5-34B-Coder-bnb-4bit",
+                    "OpenAI",
+                ],
+            )
+
         st.markdown('<div class="chat-container">', unsafe_allow_html=True)
         for message in st.session_state.conversation_history:
             st.chat_message(message["role"]).write(message["content"])
         st.markdown("</div>", unsafe_allow_html=True)
 
         if prompt := st.chat_input("데이터에 대해 질문하세요"):
-            process_chat(prompt)
+            process_chat(prompt, llm_api)
 
         if st.session_state.loading:
             with st.spinner("응답을 기다리는 중입니다..."):
