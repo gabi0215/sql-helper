@@ -6,8 +6,6 @@ from langgraph_.graph import make_graph, multiturn_test, make_graph_for_test
 from langgraph_.utils import get_runnable_config
 from dotenv import load_dotenv
 
-load_dotenv()
-
 app = FastAPI()
 
 # make_graph: 전체 과정, make_graph_for_test: 질문 구체화 생략, multiturn_test: 질문 구체화만 진행
@@ -65,4 +63,5 @@ def llm_workflow(workflow_input: LLMWorkflowInput):
 
 
 if __name__ == "__main__":
+    load_dotenv(override=True)
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)

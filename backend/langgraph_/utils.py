@@ -1,10 +1,8 @@
 from langchain_core.runnables import RunnableConfig
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers import BitsAndBytesConfig
-from unsloth import FastLanguageModel
 from huggingface_hub import login
 import argparse
-from dotenv import load_dotenv
 import os
 
 
@@ -69,9 +67,10 @@ def str2bool(v):
 
 
 def load_qwen_model():
+    from unsloth import FastLanguageModel
+
     global model, tokenizer
     # Hugging Face 토큰 설정
-    load_dotenv()
 
     # 환경 변수에서 Hugging Face 토큰 가져오기
     huggingface_token = os.getenv("HUGGINGFACE_TOKEN")
