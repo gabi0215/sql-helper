@@ -22,12 +22,11 @@ from pydantic import BaseModel, Field
 import os, re
 import torch
 
-home_path = os.path.expanduser("~")
-cache_dir = os.path.join(home_path, "sql-helper/.cache/unsloth")
 
-if not os.path.exists(cache_dir):
-    global model, tokenizer
+if torch.cuda.is_available():
     model, tokenizer = load_qwen_model()
+else:
+    print("Non-GPU env has detected.")
 
 
 def evaluate_user_question(user_question: str) -> str:
@@ -286,37 +285,48 @@ def create_query(
         # flow_status에 따른 프롬프트 생성
         if flow_status == "KEEP":
             main_prompt = load_prompt("prompts/query_creation/generate_v1.prompt")
-            full_prompt = (
-                prefix + main_prompt + postfix + f"\n\nuser_question: {user_question}"
-            )
+            system_prompt = prefix + main_prompt + postfix
         else:
             regen_prompt = load_prompt(
                 "prompts/query_creation/regenerate_v1.prompt"
             ).format(prev_query=prev_query, result_msg=error_msg)
-            full_prompt = (
-                prefix + regen_prompt + postfix + f"\n\nuser_question: {user_question}"
+            system_prompt = prefix + regen_prompt + postfix
+
+        if torch.cuda.is_available():
+            full_prompt = system_prompt + f"\n\nuser_question: {user_question}"
+            # 입력 토크나이징
+            inputs = tokenizer(
+                full_prompt,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=2048,
             )
 
-        # 입력 토크나이징
-        inputs = tokenizer(
-            full_prompt,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=2048,
-        )
+            # 모델 추론
+            with torch.no_grad():
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=512,
+                    pad_token_id=tokenizer.pad_token_id,
+                    eos_token_id=tokenizer.eos_token_id,
+                )
 
-        # 모델 추론
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=512,
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id,
+            # 결과 디코딩 및 SQL 추출
+            output = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        else:
+            output_parser = StrOutputParser()
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    SystemMessage(content=system_prompt),
+                    ("human", """user_question: {user_question}"""),
+                ]
             )
 
-        # 결과 디코딩 및 SQL 추출
-        output = tokenizer.decode(outputs[0], skip_special_tokens=True)
+            llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+            chain = prompt | llm | output_parser
+
+            output = chain.invoke({"user_question": user_question})
 
         try:
             sql_query = re.search(r"```sql\s*(.*?)\s*```", output, re.DOTALL).group(1)
