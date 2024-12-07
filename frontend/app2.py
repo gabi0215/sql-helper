@@ -197,16 +197,16 @@ def process_chat(prompt):
     st.chat_message("user").write(prompt)
     st.session_state.conversation_history.append({"role": "user", "content": prompt})
 
-    if not check_department_access(st.session_state.user["department"], prompt):
-        error_message = (
-            "접근 권한이 없습니다. 해당 부서 관련 데이터만 조회할 수 있습니다."
-        )
-        st.error(error_message)
-        st.chat_message("assistant").write(error_message)
-        st.session_state.conversation_history.append(
-            {"role": "assistant", "content": error_message}
-        )
-        return
+    # if not check_department_access(st.session_state.user["department"], prompt):
+    #     error_message = (
+    #         "접근 권한이 없습니다. 해당 부서 관련 데이터만 조회할 수 있습니다."
+    #     )
+    #     st.error(error_message)
+    #     st.chat_message("assistant").write(error_message)
+    #     st.session_state.conversation_history.append(
+    #         {"role": "assistant", "content": error_message}
+    #     )
+    #     return
 
     try:
         response = requests.post(
