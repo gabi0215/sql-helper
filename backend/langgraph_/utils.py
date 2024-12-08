@@ -1,11 +1,9 @@
 from langchain_core.runnables import RunnableConfig
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers import BitsAndBytesConfig
-from unsloth import FastLanguageModel
 from huggingface_hub import login
 import argparse
-from dotenv import load_dotenv
-import os
+import os, re
 
 
 def get_runnable_config(recursion_limit: int, thread_id: str) -> RunnableConfig:
@@ -69,9 +67,10 @@ def str2bool(v):
 
 
 def load_qwen_model():
+    from unsloth import FastLanguageModel
+
     global model, tokenizer
     # Hugging Face 토큰 설정
-    load_dotenv()
 
     # 환경 변수에서 Hugging Face 토큰 가져오기
     huggingface_token = os.getenv("HUGGINGFACE_TOKEN")
@@ -99,3 +98,15 @@ def load_qwen_model():
     model = FastLanguageModel.for_inference(model)
 
     return model, tokenizer
+
+
+def extract_context_tables(table_contexts, table_contexts_ids):
+    context_table_list = []
+    if not table_contexts_ids:
+        return []
+    table_pattern = r"CREATE TABLE\s+(.+?)\s*\("
+    for idx in table_contexts_ids:
+        table_name = re.findall(table_pattern, table_contexts[idx])[-1]
+        context_table_list.append(table_name.strip("`"))
+
+    return context_table_list

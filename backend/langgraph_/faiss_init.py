@@ -7,7 +7,6 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.utilities import SQLDatabase
 
 from sqlalchemy import create_engine, inspect, MetaData
-from dotenv import load_dotenv
 from sqlalchemy.schema import CreateTable
 
 
@@ -177,7 +176,6 @@ def embed_db_info(db_names: str | None, DB_SERVER: str, sample_info: int):
 
 
 def get_vector_stores(sample_info: int) -> Dict[str, VectorStore]:
-    load_dotenv()
     DB_SERVER = os.getenv("URL")
     information_schema_path = os.path.join(DB_SERVER, "INFORMATION_SCHEMA")  # type: ignore
     # create_engine으로 db에 접근 준비

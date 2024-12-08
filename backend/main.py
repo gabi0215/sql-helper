@@ -3,10 +3,8 @@ from pydantic import BaseModel
 import uvicorn
 
 from langgraph_.graph import make_graph, multiturn_test, make_graph_for_test
-from langgraph_.utils import get_runnable_config
+from langgraph_.utils import get_runnable_config, extract_context_tables
 from dotenv import load_dotenv
-
-load_dotenv()
 
 app = FastAPI()
 
@@ -20,13 +18,13 @@ class LLMWorkflowInput(BaseModel):
     initial_question: int
     thread_id: str
     last_snapshot_values: dict | None
+    llm_api: str
 
 
 @app.post("/llm_workflow")
 def llm_workflow(workflow_input: LLMWorkflowInput):
     global workflow
     processed_input = workflow_input.model_dump()
-
     config = get_runnable_config(30, processed_input["thread_id"])
     inputs = {
         "user_question": processed_input["user_question"],
@@ -34,6 +32,7 @@ def llm_workflow(workflow_input: LLMWorkflowInput):
         "max_query_fix": 2,
         "query_fix_cnt": -1,
         "sample_info": 5,
+        "llm_api": processed_input["llm_api"],
     }
     # 초기 질문이 아닌 경우
     if processed_input["initial_question"] == 0:
@@ -41,6 +40,7 @@ def llm_workflow(workflow_input: LLMWorkflowInput):
         values["collected_questions"][
             -1
         ] += f"\n답변: {processed_input['user_question']}"
+        values["llm_api"] = processed_input["llm_api"]
         workflow.update_state(
             config,
             values,
@@ -60,9 +60,17 @@ def llm_workflow(workflow_input: LLMWorkflowInput):
             config=config,
             interrupt_before=["human_feedback"],
         )
-    print(outputs)
+    # print(outputs)
+    if "final_answer" in outputs and outputs["user_question_eval"]:
+        print(
+            "RAG과정에서 사용된 context table:",
+            extract_context_tables(
+                outputs["table_contexts"], outputs["table_contexts_ids"]
+            ),
+        )
     return outputs
 
 
 if __name__ == "__main__":
+    load_dotenv(override=True)
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
