@@ -21,6 +21,10 @@ class LLMWorkflowInput(BaseModel):
     llm_api: str
 
 
+class UserFeedbackInput(BaseModel):
+    user_feedback: int  # 좋아요 1, 싫어요 0
+
+
 @app.post("/llm_workflow")
 def llm_workflow(workflow_input: LLMWorkflowInput):
     global workflow
@@ -61,7 +65,7 @@ def llm_workflow(workflow_input: LLMWorkflowInput):
             interrupt_before=["human_feedback"],
         )
     # print(outputs)
-    if "final_answer" in outputs and outputs["user_question_eval"]:
+    if "final_answer" in outputs and outputs["user_question_eval"] == 1:
         print(
             "RAG과정에서 사용된 context table:",
             extract_context_tables(
@@ -69,6 +73,12 @@ def llm_workflow(workflow_input: LLMWorkflowInput):
             ),
         )
     return outputs
+
+
+@app.post("/user_feedback")
+def user_feedback(feedback_input: UserFeedbackInput):
+    processed_input = feedback_input.model_dump()
+    print(processed_input)
 
 
 if __name__ == "__main__":
