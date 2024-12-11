@@ -87,7 +87,10 @@ def user_feedback(feedback_input: UserFeedbackInput):
     config = get_runnable_config(30, processed_input["thread_id"])
     snapshot = list(workflow.get_state_history(config))[0].values
 
-    save_conversation(snapshot, feedback)
+    if snapshot["user_question_eval"] == "1":
+        save_conversation(snapshot, feedback)
+    else:
+        print("simple conversation would not be saved.")
 
 
 if __name__ == "__main__":
