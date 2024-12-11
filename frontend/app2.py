@@ -261,7 +261,10 @@ def process_chat(prompt, llm_api):
 def send_feedback(feedback):
     requests.post(
         f"http://{os.getenv('BACKEND_HOST')}:8000/user_feedback",
-        json={"user_feedback": feedback},
+        json={
+            "user_feedback": feedback,
+            "thread_id": st.session_state.thread_id,
+        },
     )
     st.session_state.is_end = 0
 
@@ -352,7 +355,7 @@ def main():
         if st.session_state.is_end:
             # 좋아요&싫어요 선택
             feedback = st.feedback("thumbs")
-            if feedback:
+            if feedback is not None:
                 # 백엔드 서버에 피드백 전달
                 send_feedback(feedback)
                 st.rerun()
